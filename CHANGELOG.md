@@ -26,6 +26,14 @@ reads that marker.
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
 
+- `Screen::parse` rejects a control character in a grid row instead of
+  folding it into the cell before it: `unicode_width` answers `None` for an
+  `ESC`, a tab or a `DEL` and `Some(0)` for a combining mark, and the parser
+  read both as zero width, so the raw byte survived into every rendering.
+  An `ESC` from a snapshot made `render --svg` write a document `xmllint`
+  refuses to open, and `to_ansi` clear the screen of the reader it was
+  printed to; a combining mark still joins its cell as before (#376).
+
 ## [0.11.1] - 2026-09-16
 
 ### Added
