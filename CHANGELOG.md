@@ -17,6 +17,14 @@ reads that marker.
 
 ## [Unreleased]
 
+### Fixed
+
+- `Screen::diff` frames a row of wide characters with `│` at the same
+  display column on the text line and on the marker line. The row columns
+  were padded with `{:<width$}`, which counts `char`s, so a CJK or emoji
+  row pushed the text line's `│` right of the marker line's; both now pad
+  by display width (#380).
+
 ## [0.11.1] - 2026-09-16
 
 ### Added
