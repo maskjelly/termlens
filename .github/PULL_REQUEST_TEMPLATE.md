@@ -8,7 +8,7 @@
 - [ ] Linked an issue (or explained above why none exists)
 - [ ] Tests added/updated for the change
 - [ ] `cargo fmt --all` and `cargo clippy --workspace --all-targets --all-features` are clean
-- [ ] **All commits are signed off** (`git commit -s`) — see [CONTRIBUTING.md §5](../CONTRIBUTING.md)
-- [ ] **No AI attribution trailers** (no AI co-authors, "Generated with" footers, or bot identities) — see [CONTRIBUTING.md §6](../CONTRIBUTING.md)
+- [ ] **All commits are signed off** (`git commit -s`) — see [CONTRIBUTING.md §5](https://github.com/vyncint/termlens/blob/main/CONTRIBUTING.md#5-developer-certificate-of-origin-dco)
+- [ ] **No AI attribution trailers** (no AI co-authors, "Generated with" footers, or bot identities) — see [CONTRIBUTING.md §6](https://github.com/vyncint/termlens/blob/main/CONTRIBUTING.md#6-ai-tooling-policy)
 - [ ] `CHANGELOG.md` updated under `[Unreleased]` (user-facing changes only)
 - [ ] Snapshot changes (if any) were reviewed with `cargo insta review`, not blind-accepted

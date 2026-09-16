@@ -10,9 +10,11 @@
 #   readme-relative/         the packaged README with a relative target, which
 #                            crates.io resolves against the crate directory
 #   readme-missing/          the packaged README with a dead absolute target
+#   pr-template-relative/    the pull-request template with a relative target,
+#                            which GitHub resolves against the pull request
 #
 # The first and the last assertions are the ones that keep the gate honest: a
-# fixture that must pass, and the repository's own two files, which must still
+# fixture that must pass, and the repository's own files, which must still
 # pass. Usage: tools/link-gate-selftest/run.sh
 set -euo pipefail
 
@@ -43,10 +45,11 @@ expect "CONTRIBUTING.md: a deleted in-repo target fails" nonzero contributing-mi
 expect "CONTRIBUTING.md: a misspelled org repository fails (#351)" nonzero contributing-typo-org/CONTRIBUTING.md
 expect "README.md: a relative target fails (crates.io rewrites it)" nonzero readme-relative/README.md
 expect "README.md: a missing absolute target fails" nonzero readme-missing/README.md
-expect "this repository's own two files pass" zero "$root/README.md" "$root/CONTRIBUTING.md"
+expect "PULL_REQUEST_TEMPLATE.md: a relative target fails (#369)" nonzero pr-template-relative/PULL_REQUEST_TEMPLATE.md
+expect "this repository's own files pass" zero "$root/README.md" "$root/CONTRIBUTING.md" "$root/.github/PULL_REQUEST_TEMPLATE.md"
 
 rm -f out.log
 if [ "$status" -eq 0 ]; then
-  echo "link gate selftest: 6 expectation(s), the gate fails when it should"
+  echo "link gate selftest: 7 expectation(s), the gate fails when it should"
 fi
 exit "$status"

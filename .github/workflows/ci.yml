@@ -82,7 +82,10 @@ jobs:
       # one most likely to accumulate link rot — it points at scripts and
       # workflows that get renamed. It is not packaged, so it may keep its
       # relative links; what it may not keep is a target that is gone (#352).
-      - run: .github/scripts/check-readme-links.sh README.md CONTRIBUTING.md
+      # The pull-request template is read in a pull request body, where a
+      # relative link resolves against the pull request's URL; its two
+      # checklist links were 404s in every pull request that used it (#369).
+      - run: .github/scripts/check-readme-links.sh README.md CONTRIBUTING.md .github/PULL_REQUEST_TEMPLATE.md
       # The screens of whatever failed, in the step summary (#251). The
       # suite dogfoods the action with the CLI from this tree.
       - uses: ./.github/actions/report
