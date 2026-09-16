@@ -26,6 +26,16 @@ reads that marker.
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
 
+- The JSON reader refuses a cursor one column past the right edge, as the
+  text parser always did (#375). The column bound was `>` where the row
+  bound beside it was `>=`, so `col == cols` — a column that does not
+  exist — passed validation, and `termlens render --text` turned a JSON
+  file it had accepted into a text file its own parser then refused. The
+  shape this stops reading is the pending-wrap position (`col == cols`),
+  which a screen taken from a live terminal can carry after a write fills
+  the last column; no file in the compatibility corpus holds one. The
+  writers that emit it are not touched here.
+
 ## [0.11.1] - 2026-09-16
 
 ### Added

@@ -252,6 +252,37 @@ mod json {
         assert!(t.wait_exit()?.success());
         Ok(())
     }
+
+    /// The column bound was `>` where the row bound was `>=`, so
+    /// `col == cols` — a column that does not exist — passed validation
+    /// and `render --text` wrote a header the text parser then refused
+    /// (#375).
+    #[test]
+    fn a_cursor_past_the_grids_edge_is_refused() {
+        let screen = Screen::parse("size: 4x2  cursor: 1,3\nab\ncd").expect("a 4x2 screen");
+        assert_eq!(screen.cursor(), (1, 3, true));
+
+        for (row, col) in [(0_u16, 4_u16), (2, 0)] {
+            let mut value = serde_json::to_value(&screen).unwrap();
+            value["cursor"]["row"] = row.into();
+            value["cursor"]["col"] = col.into();
+            let err = serde_json::from_value::<termlens::Screen>(value)
+                .expect_err("a cursor off the grid is refused")
+                .to_string();
+            assert!(
+                err.contains(&format!("cursor {row},{col} is outside a 4x2 screen")),
+                "refused with the existing message: {err}"
+            );
+        }
+
+        let mut value = serde_json::to_value(&screen).unwrap();
+        value["cursor"]["row"] = 1.into();
+        value["cursor"]["col"] = 3.into();
+        assert!(
+            serde_json::from_value::<termlens::Screen>(value).is_ok(),
+            "the last column and row are real"
+        );
+    }
 }
 
 /// A grid can hold the words a styles block is made of. Reading them as

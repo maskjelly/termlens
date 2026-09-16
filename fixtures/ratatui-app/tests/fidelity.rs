@@ -91,6 +91,16 @@ fn expected(from: &Screen, state: &State) -> Screen {
     let (cols, rows) = from.size();
     let mut value = serde_json::to_value(from).expect("a Screen serializes");
     value["cells"] = cells(&render(cols, rows, state));
+    // Ratatui leaves the hidden cursor in the pending-wrap position, one
+    // past the last column, which the reader refuses (#375); a hidden
+    // cursor's position is not part of the picture the diff compares
+    // (#298), so clamp it back onto the grid. A visible cursor keeps its
+    // position: there, the clamp would be hiding a real disagreement.
+    if value["cursor"]["visible"] == json!(false) {
+        if let Some(col) = value["cursor"]["col"].as_u64() {
+            value["cursor"]["col"] = col.min(u64::from(cols.saturating_sub(1))).into();
+        }
+    }
     serde_json::from_value(value).expect("the cells hold together")
 }
 
