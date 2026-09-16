@@ -71,8 +71,12 @@ gh run watch                                  # ubuntu, macos, windows × 5 shar
 
 # 1. Bump the version (workspace.package.version in root Cargo.toml), and
 #    the same number in crates/termlens-cli/Cargo.toml's `termlens = { version
-#    = … }` — a path dependency publishes by its version.
+#    = … }` — a path dependency publishes by its version. The `report@vX.Y.Z`
+#    action pin lives in three hand-maintained files, and releases bumped two
+#    of the three twice before the gate that catches it existed (#386);
+#    `check-report-pin.sh` fails whenever one disagrees with this number.
 $EDITOR Cargo.toml crates/termlens-cli/Cargo.toml
+$EDITOR README.md .github/actions/report/README.md skills/termlens/SKILL.md
 cargo check --workspace                       # refreshes Cargo.lock
 
 # 2. Move the CHANGELOG section. A `- **Breaking:**` bullet moves with it,

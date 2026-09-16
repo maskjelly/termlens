@@ -53,6 +53,7 @@ cargo build -p termlens-cli                              # then the CLI's docume
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features
 .github/scripts/check-candidate-statement.sh              # README, CHANGELOG and STABILITY state the candidate in the same words
+.github/scripts/check-report-pin.sh                       # the three report@v refs agree with the workspace version
 cargo deny check                          # cargo install cargo-deny
 pipx run zizmor==1.29.0 --persona=pedantic .github/workflows/   # workflow audit; needs GH_TOKEN for the online checks
 cargo +1.85 check --workspace --exclude ratatui-app --locked --all-targets    # the MSRV: `rust-version` in Cargo.toml (the ratatui fixture needs 1.88)
@@ -61,6 +62,7 @@ cargo +1.85 check -p termlens --no-default-features --all-targets --locked
 cargo clippy --workspace --all-targets --all-features --target x86_64-pc-windows-msvc -- -D warnings   # the Windows build, from any host: `rustup target add x86_64-pc-windows-msvc` once
 tools/semver-gate-selftest/run.sh                       # the semver gate can fail (cargo install cargo-semver-checks)…
 tools/link-gate-selftest/run.sh                         # …and so can the link gate, with no extra tooling
+tools/report-pin-gate-selftest/run.sh                   # …and the report-pin gate, likewise
 .github/scripts/check-semver.sh 0.11.1                  # …and the public API is compatible with the last published release
 ```
 
