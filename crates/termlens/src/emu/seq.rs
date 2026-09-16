@@ -396,6 +396,11 @@ pub(crate) enum SeqEvent {
     /// its own state to the defaults; the emulator must do the same for
     /// the modes it holds.
     SoftReset,
+    /// `RIS` (`ESC c`) completed: the tracker has already returned its
+    /// own state to power-on, and the emulator must save the rows that
+    /// scrolled before this byte, because the backend's history is about
+    /// to be rebuilt empty (#391).
+    HardReset,
     /// The application asked the terminal a question.
     Query(Query),
     /// An inline graphics payload completed. Carried out of the tracker
@@ -1642,6 +1647,10 @@ impl SeqTracker {
                     self.insert_mode = false;
                     self.tabs.reset();
                     self.close_link();
+                    // The grid rebuild is vt100's; the event tells the
+                    // emulator to capture what scrolled before it, since
+                    // that history is what the rebuild discards (#391).
+                    event = SeqEvent::HardReset;
                     State::Ground
                 }
                 // DECSC / DECRC: the charset half of save-cursor and
@@ -2659,6 +2668,21 @@ mod tests {
         let events: Vec<SeqEvent> = b"\x1b[?2026l".iter().map(|&b| t.step(b)).collect();
         assert_eq!(*events.last().unwrap(), SeqEvent::SyncEnd);
         assert!(!t.in_sync_update());
+    }
+
+    /// The hard reset is the one sequence that empties the backend's
+    /// history, so the emulator must hear about it to save what scrolled
+    /// before it (#391). `CSI c` is a device-attributes query, not the
+    /// reset, and the same final byte must not fire the event.
+    #[test]
+    fn hard_reset_fires_an_event_and_csi_c_does_not() {
+        let mut t = SeqTracker::new(crate::graphics::DEFAULT_CAPTURE, TEST_COLS);
+        let events: Vec<SeqEvent> = b"\x1bc".iter().map(|&b| t.step(b)).collect();
+        assert_eq!(*events.last().unwrap(), SeqEvent::HardReset);
+
+        let mut t = SeqTracker::new(crate::graphics::DEFAULT_CAPTURE, TEST_COLS);
+        let events: Vec<SeqEvent> = b"\x1b[c".iter().map(|&b| t.step(b)).collect();
+        assert!(!events.contains(&SeqEvent::HardReset));
     }
 
     #[test]

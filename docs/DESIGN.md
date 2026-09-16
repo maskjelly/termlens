@@ -469,14 +469,19 @@ dominate the cost of every wait, and history is asserted on for its
 content.
 
 Below the retention length the history only grows, so a chunk that
-scrolled nothing costs one length check. At the length, vt100 evicts from
-the front and its length stops changing, so growth is no longer visible
-there — and there is no sound cheap substitute, since consecutive
-identical rows are ordinary output and comparing the ends of the history
-would miss real scrolls. So at the bound the window vt100 still holds is
-re-read, which is by definition the newest N rows. Measured on 50,000
-lines through an 80x24 screen: 352ms with retention off, 327ms below the
-bound (free, within noise), 639ms on the re-read path.
+scrolled nothing costs one length check. A hard reset (`RIS`, `ESC c`) is
+the exception: it rebuilds the screen and empties the history, so the rows
+that scrolled before it are captured before the reset is applied, and a
+history shorter than the mark rewinds it — which is how the rows that
+scroll after the reset are still captured (#391). At the length, vt100
+evicts from the front and its length stops changing, so growth is no
+longer visible there — and there is no sound cheap substitute, since
+consecutive identical rows are ordinary output and comparing the ends of
+the history would miss real scrolls. So at the bound the window vt100
+still holds is re-read, which is by definition the newest N rows.
+Measured on 50,000 lines through an 80x24 screen: 352ms with retention
+off, 327ms below the bound (free, within noise), 639ms on the re-read
+path.
 
 History is text unless the builder asks for styles (`scrollback_styles`),
 in which case the scrolled rows are captured as cells too and the shadow
