@@ -26,6 +26,17 @@ reads that marker.
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
 
+- `Screen::to_svg` and `Screen::to_html` render blink (`SGR 5`) instead of
+  dropping it (#378). Every other `Style` attribute already reached all
+  three renderings, so a blinking cell produced the very same SVG and HTML
+  as a steady one — and blink is the attribute the shadow parser exists to
+  recover, so the regression was invisible in exactly the artefact a
+  reviewer looks at. The SVG gets an `<animate>` child on the blinking
+  `<text>`; the HTML gets a `termlens-blink` keyframes rule in a `<style>`
+  element inside the `<pre>`, written only when a run blinks, animating
+  the glyph's colour so a dim blink keeps its dim and the background keeps
+  painting.
+
 ## [0.11.1] - 2026-09-16
 
 ### Added
