@@ -495,6 +495,52 @@ fn a_resize_stops_offering_frames_drawn_at_the_old_size() -> termlens::Result<()
     Ok(())
 }
 
+/// The counterpart of the case above, and the one the suite missed because
+/// every resize test changed a dimension: a resize to the size the terminal
+/// already has sends no `SIGWINCH` — the kernel raises it only on an actual
+/// change — so the application never hears about it and never repaints.
+/// Moving the cursor anyway hid the frame the application last drew from
+/// `wait_frame` for good and ran the wait this crate recommends out to its
+/// whole deadline (#397).
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "ConPTY closes a DEC 2026 bracket before the content it wrapped, so no frame holds what was drawn (#149)"
+)]
+fn a_resize_to_the_current_size_leaves_the_last_frame_observable() -> termlens::Result<()> {
+    let mut t = emit(
+        Terminal::builder()
+            .size(60, 12)
+            .timeout(Duration::from_secs(10)),
+        // One frame, then park: a no-op resize has no signal for the
+        // application to react to, so this stays the only frame it draws.
+        &["--raw", r"\e[?2026h\e[2J\e[HSAME-SIZE\e[?2026l", "--wait"],
+    )?;
+
+    // `wait_until` on the repaint count rather than `wait_frame`: the frame
+    // must be published *and unconsumed* when the resize happens, or a cursor
+    // advance would have nothing to hide and this would pass for the wrong
+    // reason. The count is the same fact `wait_frame` gates on, where the
+    // text alone can be on the grid before its closing marker is read.
+    t.wait_until(|s| s.repaints() == 1 && s.contains("SAME-SIZE"))?;
+
+    let start = Instant::now();
+    t.resize(60, 12)?;
+    let frame = t.wait_frame(|s| s.contains("SAME-SIZE"))?;
+    assert_eq!(frame.size(), (60, 12), "{frame}");
+    // Generous, deliberately not a second deadline: the frame is already
+    // drawn and unconsumed, so a wait for it has nothing to wait for.
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "a no-op resize must not put the last frame behind the cursor: {:?}",
+        start.elapsed()
+    );
+
+    t.send(Key::Enter)?;
+    assert!(t.wait_exit()?.success());
+    Ok(())
+}
+
 /// The repaint that answers a resize is offered to `wait_frame`, however fast
 /// the application is, and it is drawn into the resized grid. The frame
 /// cursor used to be taken *after* the SIGWINCH went out, so an acknowledging

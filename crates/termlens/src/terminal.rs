@@ -3345,8 +3345,11 @@ impl Terminal {
     /// `send(key)` followed by `wait_frame(|s| s.contains(OLD_STATE))` now
     /// times out instead of passing on the superseded frame.
     ///
-    /// A [`resize`](Self::resize) also advances the cursor: a frame drawn
-    /// at the old size is not the repaint that answers the new one.
+    /// A [`resize`](Self::resize) that changes a dimension also advances the
+    /// cursor: a frame drawn at the old size is not the repaint that answers
+    /// the new one. A resize to the size the grid already has is a true
+    /// no-op — no `SIGWINCH`, no repaint — so it leaves the cursor where it
+    /// was, and the frame the application last drew is still offered.
     ///
     /// A frame is one *completed* synchronized update: an
     /// `EndSynchronizedUpdate` that closes a Begin this terminal actually
@@ -4002,9 +4005,13 @@ impl Terminal {
     /// Wait for something only the post-SIGWINCH frame can show — content
     /// that needs the new width, a complete status bar on the new bottom
     /// row — or use [`wait_frame`](Self::wait_frame) where the app emits
-    /// synchronized updates, which is unconditionally safe here: a resize
-    /// advances the frame cursor, so only a frame completed *after* it can
-    /// satisfy the wait. `docs/DESIGN.md` §2 shows the trap in full.
+    /// synchronized updates, which is safe here when the size actually
+    /// changes: the frame cursor advances, so only a frame completed
+    /// *after* it can satisfy the wait. A resize to the size the grid
+    /// already has is a no-op — `TIOCSWINSZ` raises no `SIGWINCH` for an
+    /// unchanged size, so there is no repaint and the cursor stays put —
+    /// and the frame the application last drew is the current truth.
+    /// `docs/DESIGN.md` §2 shows the trap in full.
     ///
     /// # Wait before typing
     ///
@@ -4083,6 +4090,17 @@ impl Terminal {
         // repaint that answers this resize, so it stops being offered.
         let cursor = self.shared.mutate(|state| {
             let (old_cols, old_rows) = state.peek_snapshot().size();
+            // A resize to the size the grid already has is a true no-op, and
+            // it has to be one: TIOCSWINSZ raises SIGWINCH only when a
+            // dimension actually changes, so the application is never told
+            // and never repaints — while advancing the cursor would put the
+            // frame it last drew permanently past `wait_frame`'s reach, the
+            // opposite of what the advice above promises (#397). The size is
+            // compared under the same lock that would move the cursor, so the
+            // decision and the move are one step to the reader thread.
+            if (old_cols, old_rows) == (cols, rows) {
+                return Ok(None);
+            }
             state.emu.set_size(rows, cols);
             if let Err(e) = master.resize(size) {
                 // The grid and the kernel must not disagree: undo the grid.
@@ -4090,9 +4108,11 @@ impl Terminal {
                 return Err(Error::Pty(format!("resize failed: {e}")));
             }
             state.touch();
-            Ok(state.frames_seen)
+            Ok(Some(state.frames_seen))
         })?;
-        self.frame_cursor = cursor;
+        if let Some(cursor) = cursor {
+            self.frame_cursor = cursor;
+        }
         Ok(())
     }
 }

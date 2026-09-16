@@ -273,8 +273,10 @@ screen dump** — a CI log alone answers "what was the app showing?".
   deliberately, so a fast application cannot slip one past you between
   two waits — but a *superseded* frame no longer can, which is what makes
   `send(key); wait_frame(old_state)` fail instead of passing on stale
-  content. `resize` advances the cursor too: a frame drawn at the old
-  size is not the repaint that answers the new one.
+  content. A `resize` that changes a dimension advances the cursor too: a
+  frame drawn at the old size is not the repaint that answers the new one.
+  A resize to the size the grid already has is a no-op — no `SIGWINCH`, no
+  repaint — and leaves the cursor where it was.
 
   Honest caveat: a burst longer than the retention bound drops its
   oldest frames. A frame is one *completed* update — an End that closes a
@@ -418,9 +420,11 @@ clipped old frame still says `tasks (10)` — the wait resolves before
 the app has repainted at all. Wait for something only the
 post-SIGWINCH frame can show — content that needs the new width, a
 complete status bar on the new bottom row — or use `wait_frame` where
-the app emits synchronized updates, which is now unconditionally safe
-here: `resize` advances the frame cursor, so only a frame completed
-*after* the resize can satisfy the wait.
+the app emits synchronized updates, which is safe here when the size
+actually changes: `resize` advances the frame cursor, so only a frame
+completed *after* the resize can satisfy the wait. A resize to the size
+the grid already has is a no-op, and the frame the application last drew
+is still the current truth.
 
 ### The instant-exit caveat (macOS PTY teardown)
 

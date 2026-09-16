@@ -26,6 +26,14 @@ reads that marker.
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
 
+- `Terminal::resize` to the size the grid already has is a true no-op: no
+  `TIOCSWINSZ`, no `SIGWINCH`, and the frame cursor stays where it was, so
+  the `wait_frame` its rustdoc recommends still sees the frame the
+  application last drew. The cursor used to advance although the
+  application was never told, and the wait could only run out its
+  deadline — the shape a parameterised layout test produces when its size
+  list repeats one (#397).
+
 ## [0.11.1] - 2026-09-16
 
 ### Added
