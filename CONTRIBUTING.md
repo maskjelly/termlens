@@ -30,9 +30,9 @@ cargo test --workspace --all-features   # the whole suite: unit + integration + 
 ```
 
 `--all-features` matters: `decode` is off by default, and without it the
-`decode` tests never build. That is the `test` job. CI gates on more than the test
-job, and every gate is reproducible locally — run these before pushing and
-nothing in CI should surprise you:
+`decode` tests never build. That is the `test` job. CI gates on more than
+the test job, and every gate is reproducible locally — run these before
+pushing and nothing in CI should surprise you:
 
 ```sh
 cargo fmt --all --check
