@@ -29,8 +29,8 @@ cd termlens
 cargo test --workspace --all-features   # the whole suite: unit + integration + doctests, `decode` included
 ```
 
-`--all-features` matters: `decode` is off by default, and without it sixteen
-tests never build. That is the `test` job. CI gates on more than the test
+`--all-features` matters: `decode` is off by default, and without it the
+`decode` tests never build. That is the `test` job. CI gates on more than the test
 job, and every gate is reproducible locally — run these before pushing and
 nothing in CI should surprise you:
 
