@@ -9,9 +9,13 @@ use termlens::{Key, Terminal};
 mod common;
 
 fn emit(steps: &[&str]) -> termlens::Result<Terminal> {
+    emit_sized(20, 4, steps)
+}
+
+fn emit_sized(cols: u16, rows: u16, steps: &[&str]) -> termlens::Result<Terminal> {
     common::spawn_emit(
         Terminal::builder()
-            .size(20, 4)
+            .size(cols, rows)
             .timeout(Duration::from_secs(10)),
         steps,
     )
@@ -58,6 +62,50 @@ fn a_full_row_ended_by_a_newline_is_not_a_wrap() -> termlens::Result<()> {
         s.logical_text().trim_end(),
         "12345678901234567890\nnext\nDONE",
         "{s}"
+    );
+    t.send(Key::Enter)?;
+    assert!(t.wait_exit()?.success());
+    Ok(())
+}
+
+/// With nothing wrapped there is nothing to undo, so the two accessors
+/// agree on the whole grid — leading blank rows and an all-blank screen
+/// included (#377).
+#[test]
+fn logical_text_is_text_verbatim_when_no_row_wraps() -> termlens::Result<()> {
+    let mut t = emit_sized(20, 5, &["\n\nhello world\n", "--wait"])?;
+    t.wait_until(|s| s.contains("hello world"))?;
+    let s = t.screen();
+    assert_eq!(s.text(), "\n\nhello world\n\n", "{s}");
+    assert_eq!(s.logical_text(), s.text(), "{s}");
+    t.send(Key::Enter)?;
+    assert!(t.wait_exit()?.success());
+
+    // An all-blank screen is blank lines, not the empty string.
+    let mut blank = emit_sized(20, 5, &["--wait"])?;
+    let s = blank.screen();
+    assert_eq!(s.text(), "\n\n\n\n", "{s}");
+    assert_eq!(s.logical_text(), s.text(), "{s}");
+    blank.send(Key::Enter)?;
+    assert!(blank.wait_exit()?.success());
+    Ok(())
+}
+
+/// A wrapped screen differs from `text()` by the joined wrap and nothing
+/// else — the leading blank row survives (#377). This is the issue's 10x4
+/// reproduction with `printf '\nabcdefghijklm\n'`.
+#[test]
+fn logical_text_differs_from_text_only_by_the_joined_wrap() -> termlens::Result<()> {
+    let mut t = emit_sized(10, 4, &["\nabcdefghijklm\n", "--wait"])?;
+    t.wait_until(|s| s.contains("klm"))?;
+    let s = t.screen();
+    assert!(s.row_wrapped(1), "row 1 ended in a soft wrap: {s}");
+    assert_eq!(s.text(), "\nabcdefghij\nklm\n", "{s}");
+    assert_eq!(s.logical_text(), "\nabcdefghijklm\n", "{s}");
+    assert_eq!(
+        s.logical_text(),
+        s.text().replace("abcdefghij\nklm", "abcdefghijklm"),
+        "the only difference is the joined wrap: {s}"
     );
     t.send(Key::Enter)?;
     assert!(t.wait_exit()?.success());
