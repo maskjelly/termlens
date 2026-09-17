@@ -701,3 +701,204 @@ fn inspect_refuses_a_cwd_that_is_not_a_directory() -> termlens::Result<()> {
     );
     Ok(())
 }
+
+/// `inspect` exists so a test sees the screen its own program will see, so
+/// the child environment starts bare; `--inherit-env` is the explicit
+/// opt-in to the caller's (#367). A regression in either direction is
+/// silent: the screen still renders, it is simply the wrong one.
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_clears_the_caller_env_unless_inherit_env_is_passed() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        env("TERMLENS_INSPECT_CALLER", "zzz"),
+        args([
+            "inspect",
+            "--size",
+            "60x3",
+            "sh",
+            "-c",
+            "echo \"[$TERMLENS_INSPECT_CALLER]\""
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let s = t.screen();
+    assert!(s.contains("[]"), "absent without --inherit-env: {s}");
+    assert!(!s.contains("zzz"), "the caller's variable leaked in: {s}");
+
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        env("TERMLENS_INSPECT_CALLER", "zzz"),
+        args([
+            "inspect",
+            "--size",
+            "60x3",
+            "--inherit-env",
+            "sh",
+            "-c",
+            "echo \"[$TERMLENS_INSPECT_CALLER]\""
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    assert!(t.screen().contains("[zzz]"), "{}", t.screen());
+    Ok(())
+}
+
+/// `--env KEY=VALUE` sets variables in the otherwise bare child
+/// environment, and splits on the **first** `=` so a value may contain
+/// more of them (#367).
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_env_sets_a_variable_and_splits_on_the_first_equals() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size",
+            "60x3",
+            "--env",
+            "TERMLENS_INSPECT_SET=zzz",
+            "sh",
+            "-c",
+            "echo \"[$TERMLENS_INSPECT_SET]\""
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    assert!(t.screen().contains("[zzz]"), "{}", t.screen());
+
+    // The first `=`, not the last: `A=b=c` means `A` is `b=c`.
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size",
+            "60x3",
+            "--env",
+            "TERMLENS_INSPECT_SPLIT=b=c",
+            "sh",
+            "-c",
+            "echo \"[$TERMLENS_INSPECT_SPLIT]\""
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    assert!(t.screen().contains("[b=c]"), "{}", t.screen());
+
+    // The case where the two splits disagree: an empty key is refused, so
+    // this cannot pass under both `split_once` and `rsplit_once` the way
+    // the `[b=c]` assertion above can — the child sees `A=b=c` either way
+    // and the shell splits it itself. This is the assertion that bites.
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        args(["inspect", "--size", "60x3", "--env", "=a=b", "sh", "-c", "echo hi"])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(2), "{}", t.screen());
+    assert!(
+        t.screen()
+            .contains(r#"bad --env "=a=b", expected e.g. NO_COLOR=1"#),
+        "an empty key is refused with the flag's own diagnostic: {}",
+        t.screen()
+    );
+    Ok(())
+}
+
+/// `--idle` is the settle window after a `--timeout` deadline: output that
+/// arrives inside it is on the snapshot, output after it is not (#367). A
+/// regression here would be someone else's flake, so this test pins both
+/// sides of the window.
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_idle_window_decides_what_the_deadline_snapshot_holds() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    // `first` lands well before the 3s deadline, `second` four seconds in.
+    // The two sides: a window already satisfied at the deadline (300 ms of
+    // silence against nearly 3 s of it) ends the wait there with `first`
+    // only, while a five-second window sits above the timeout, so the wait's
+    // bound is what ends it — after `second` has arrived and before the
+    // silence could ever be satisfied — and the screen holds both. Neither
+    // side races the 4 s mark that way.
+    // The trailing `sleep` keeps the child alive after its last write: a
+    // write-then-exit races the platform's PTY teardown and the final bytes
+    // can be lost (docs/DESIGN.md).
+    let child = "printf first; sleep 4; printf ' second'; sleep 30";
+    let run = |idle: &str| {
+        termlens::bin!(
+            "termlens",
+            env("PATH", &path),
+            // The harness deadline also covers the spawn (CONTRIBUTING §3),
+            // so it is generous rather than tight around the CLI's own 3s.
+            timeout(std::time::Duration::from_secs(30)),
+            args([
+                "inspect",
+                "--size",
+                "60x3",
+                "--timeout",
+                "3",
+                "--idle",
+                idle,
+                "sh",
+                "-c",
+                child
+            ])
+        )
+    };
+
+    let mut t = run("300")?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let s = t.screen();
+    assert!(s.contains("first"), "{s}");
+    assert!(
+        !s.contains("second"),
+        "the gap sits outside the window: {s}"
+    );
+
+    let mut t = run("5000")?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    assert!(t.screen().contains("first second"), "{}", t.screen());
+    Ok(())
+}
+
+/// `--timeout` is the other half of the same pair: a program that outlives
+/// it is snapshotted where it stands and reported as still running, not
+/// treated as an error (#367). `second` is what separates a 3s deadline
+/// from the 5s default: the default would hold it, the flag must not. The
+/// harness deadline is generous because it also covers the spawn
+/// (CONTRIBUTING §3).
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_timeout_snapshots_a_program_that_outlives_it() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        timeout(std::time::Duration::from_secs(30)),
+        args([
+            "inspect",
+            "--size",
+            "60x3",
+            "--timeout",
+            "3",
+            "sh",
+            "-c",
+            "printf first; sleep 4; printf ' second'; sleep 30"
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let s = t.screen();
+    assert!(s.contains("first"), "the pre-deadline output is kept: {s}");
+    assert!(
+        !s.contains("second"),
+        "output past the 3s deadline is not the snapshot: {s}"
+    );
+    assert!(
+        s.contains("--- still running at the deadline (killed on exit) ---"),
+        "{s}"
+    );
+    Ok(())
+}
