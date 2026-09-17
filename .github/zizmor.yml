@@ -14,3 +14,12 @@ rules:
       - release.yml
       - install.yml
       - windows.yml
+
+  # The wider `.github/` scope reaches dependabot.yml, which the workflow-only
+  # glob never parsed. No cooldown is configured there (GitHub's built-in
+  # default is three days; zizmor wants seven). Accepted rather than fixed
+  # here: the fix changes dependency-update policy, which is a separate
+  # decision from pointing the audit at `.github/` (#389).
+  dependabot-cooldown:
+    ignore:
+      - dependabot.yml

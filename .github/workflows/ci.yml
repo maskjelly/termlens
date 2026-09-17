@@ -324,8 +324,10 @@ jobs:
           persist-credentials: false
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
 
-  # Workflow security audit (template injection, credential persistence,
-  # unpinned actions, …). Accepted findings live in .github/zizmor.yml.
+  # Security audit of everything under .github — the workflows, and the
+  # composite action this repository ships for other repositories to
+  # execute (template injection, credential persistence, unpinned
+  # actions, …). Accepted findings live in .github/zizmor.yml.
   zizmor:
     name: zizmor
     runs-on: ubuntu-latest
@@ -333,7 +335,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Audit workflows at pedantic level
+      - name: Audit .github at pedantic level
         env:
           GH_TOKEN: ${{ github.token }}
         # Version pinned; bump deliberately alongside a fresh local audit.
@@ -344,7 +346,7 @@ jobs:
         # a release (run 31307319409). A genuine finding fails identically
         # on the retry, so nothing real can slip through.
         run: |
-          audit() { pipx run zizmor==1.29.0 --persona=pedantic .github/workflows/; }
+          audit() { pipx run zizmor==1.29.0 --persona=pedantic .github/; }
           audit || {
             echo "::warning::zizmor failed; retrying once in 30s in case of a transient online-audit network error"
             sleep 30

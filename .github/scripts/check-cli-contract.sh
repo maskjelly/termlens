@@ -102,6 +102,7 @@ expect "render --text"             0 "$BIN" render --text "$WORK/a.snap"
 expect "render --svg"              0 "$BIN" render --svg  "$WORK/a.snap"
 expect "render --html"             0 "$BIN" render --html "$WORK/a.snap"
 expect "render --ansi"             0 "$BIN" render --ansi "$WORK/a.snap"
+expect "render --json"             0 "$BIN" render --json "$WORK/a.snap"
 "$BIN" render --svg "$WORK/a.snap" > "$WORK/out.svg" 2>/dev/null || true
 if head -c 4 "$WORK/out.svg" | grep -q '<svg'; then
   printf '  ok    %-46s starts with <svg\n' "render --svg"
@@ -109,6 +110,12 @@ else
   printf '  FAIL  %-46s does not start with <svg\n' "render --svg" >&2
   status=1
 fi
+
+# --- the JSON is a promised format too: the document says which one, and
+# render reads back what render wrote (#373).
+"$BIN" render --json "$WORK/a.snap" > "$WORK/out.json" 2>/dev/null || true
+contains "render --json, format 1" '"format": 1' "$WORK/out.json"
+expect "render --json, read back"  0 "$BIN" render --text "$WORK/out.json"
 
 # --- the three flags 0.11.1 added (#312, #313, #317). Here and not only in
 # tests/cli.rs because this script runs against the *published* binary.

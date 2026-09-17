@@ -8,10 +8,13 @@ set -euo pipefail
 ci="${1:-.github/workflows/ci.yml}"
 doc="${2:-CONTRIBUTING.md}"
 
-# Single-line `- run: cargo …` steps are the reproducible gates. Multi-line
-# `run: |` blocks are job plumbing (the msrv assertion, the zizmor retry,
-# required-green's jq) and are not something a contributor types.
-ci_cmds="$(sed -n 's/^[[:space:]]*- run: \(cargo .*\)$/\1/p' "$ci" | sed -E 's/[[:space:]]+/ /g')"
+# Single-line reproducible gates start with `cargo`, `.github/scripts/` or
+# `tools/`. Multi-line `run: |` blocks are job plumbing (the msrv assertion,
+# the zizmor retry, required-green's jq) and are not something a contributor
+# types.
+ci_cmds="$(sed -n -E 's/^[[:space:]]*- run: (cargo |\.github\/scripts\/|tools\/)(.*)$/\1\2/p' "$ci" | sed -E 's/[[:space:]]+/ /g')"
+cargo_count="$(grep -c '^cargo ' <<<"$ci_cmds" || true)"
+script_count="$(grep -Ec '^(\.github/scripts/|tools/)' <<<"$ci_cmds" || true)"
 
 # CONTRIBUTING §1: the shared extraction in extract-gates.sh (#368), plus
 # the normalisations this comparison alone needs — the RUSTDOCFLAGS prefix
@@ -38,6 +41,6 @@ if [ -n "$pin" ] && ! grep -Fq -- "$pin" "$doc"; then
 fi
 
 if [ "$status" -eq 0 ]; then
-  echo "every CI gate is listed in CONTRIBUTING.md §1 ($(grep -c . <<<"$ci_cmds") commands, $pin)"
+  echo "every CI gate is listed in CONTRIBUTING.md §1 ($cargo_count cargo commands, $script_count script gates, $pin)"
 fi
 exit "$status"

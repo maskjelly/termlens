@@ -19,6 +19,13 @@ reads that marker.
 
 ### Added
 
+- `termlens render --json` writes the screen as the format-1 JSON document
+  of `docs/STABILITY.md`, pretty-printed and newline-terminated like the
+  corpus files (#373). `render` and `diff` read that document from the
+  start and nothing produced one, so converting text to JSON took a Rust
+  program; now the two promised saved-screen formats are interchangeable
+  through the CLI, in both directions.
+
 - `termlens inspect` accepts the `--flag=value` spelling of `--size`,
   `--timeout`, `--idle`, `--cwd` and `--env`, the form `diff --color=`
   and `render --out=` already took (#366). `--env=A=b` splits on the first
