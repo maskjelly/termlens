@@ -176,6 +176,11 @@ impl Screen {
     /// an `<animate>` on the glyph's own opacity — the background `<rect>`
     /// is a sibling, so it keeps painting, as it does in a terminal.
     ///
+    /// Unlike the HTML rendering, the SVG one cannot honour
+    /// `prefers-reduced-motion`: SMIL is not reachable from CSS, and an
+    /// `<animate>` has no media-query form. A reader who needs the motion
+    /// stopped should take the HTML rendering, which does honour it.
+    ///
     /// The root carries `role="img"` and a `<title>` naming the picture —
     /// `termlens screen, 80x24`, and the application's own
     /// [`title`](Self::title) after it when one was set. These files are made
@@ -284,7 +289,10 @@ impl Screen {
     /// the run's background keeps painting, as it does in a terminal. The
     /// `@keyframes` live in a `<style>` element inside the `<pre>` (a
     /// `style` attribute cannot hold one) and travel only when a run
-    /// blinks, so a screen without one renders as it always has.
+    /// blinks, so a screen without one renders as it always has. A
+    /// `prefers-reduced-motion` rule beside them stops the animation for
+    /// a reader who asked for that; the selector matches the inline style,
+    /// since that is where the `animation` lands.
     #[must_use]
     pub fn to_html(&self) -> String {
         let mut out = format!(
@@ -292,7 +300,11 @@ impl Screen {
              line-height:1.2;padding:8px\">"
         );
         if (0..self.rows()).any(|row| runs(self, row).iter().any(|(_, _, style, _)| style.blink)) {
-            out.push_str("<style>@keyframes termlens-blink{50%{color:transparent}}</style>");
+            out.push_str(
+                "<style>@keyframes termlens-blink{50%{color:transparent}}\
+                 @media(prefers-reduced-motion:reduce){\
+                 [style*=termlens-blink]{animation:none}}</style>",
+            );
         }
         for row in 0..self.rows() {
             for (_, cols, style, text) in runs(self, row) {

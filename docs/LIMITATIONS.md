@@ -110,6 +110,11 @@ CHANGELOG entry.
 - **Two SGR style attributes are not modeled.** Overline (`SGR 53`) and double
   underline (`SGR 21`) do not reach [`Style`](https://docs.rs/termlens/latest/termlens/struct.Style.html),
   so `with_styles()` cannot distinguish those attributes from a plain cell.
+  Blink reaches the ANSI, HTML and SVG renderings. The HTML one stops
+  animating under `prefers-reduced-motion`; the SVG one cannot, since SMIL
+  is not reachable from CSS — take the HTML rendering if the motion has to
+  stop.
+
   And bold and dim are **one intensity state**, not two: the last of
   `SGR 1`/`SGR 2` written wins, so a cell never reports both.
 
