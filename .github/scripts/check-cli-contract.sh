@@ -143,6 +143,28 @@ else
   printf '  FAIL  %-46s exit %s, expected 2 naming stdin\n' "diff - -" "$got" >&2
   status=1
 fi
+# `render`'s one operand is the whole input, and the last of several used to
+# win silently: with --out the wrong screen was written and nothing printed
+# to show it (#364). Refused with the usage, and no file is created.
+got=0
+"$BIN" render --text "$WORK/a.snap" "$WORK/b.snap" > "$WORK/out" 2> "$WORK/err" || got=$?
+if [ "$got" = 2 ] && grep -qF -- 'usage: termlens render' "$WORK/err"; then
+  printf '  ok    %-46s exit 2, prints the usage\n' "render, two operands"
+else
+  printf '  FAIL  %-46s exit %s, expected 2 with the usage\n' "render, two operands" "$got" >&2
+  sed 's/^/        /' "$WORK/err" >&2 || true
+  status=1
+fi
+got=0
+"$BIN" render --svg --out "$WORK/never.svg" "$WORK/a.snap" "$WORK/b.snap" \
+  > "$WORK/out" 2> "$WORK/err" || got=$?
+if [ "$got" = 2 ] && [ ! -e "$WORK/never.svg" ]; then
+  printf '  ok    %-46s exit 2, no file\n' "render --out, two operands"
+else
+  printf '  FAIL  %-46s exit %s, or left a file behind\n' \
+    "render --out, two operands" "$got" >&2
+  status=1
+fi
 expect "inspect --cwd, missing directory" 2 "$BIN" inspect --cwd "$WORK/no-such-dir" true
 "$BIN" inspect --size 200x3 --cwd "$WORK" sh -c pwd > "$WORK/cwd.snap" 2>/dev/null || true
 contains "inspect --cwd runs the program there" "$(basename "$WORK")" "$WORK/cwd.snap"

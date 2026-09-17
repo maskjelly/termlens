@@ -496,6 +496,81 @@ fn render_out_writes_the_file_and_creates_none_when_the_render_fails() -> termle
     Ok(())
 }
 
+/// The operand is the whole input: two of them are ambiguous, and the last
+/// silently winning is how a stale path renders a screen nobody named —
+/// with `--out` there is nothing on screen to reveal it (#364).
+#[test]
+fn render_refuses_a_second_operand() -> termlens::Result<()> {
+    use std::process::Command;
+    let bin = env!("CARGO_BIN_EXE_termlens");
+    let dir = std::env::temp_dir().join(format!("termlens-render-operands-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let a = dir.join("a.snap");
+    let b = dir.join("b.snap");
+    std::fs::write(&a, "size: 10x1  cursor: 0,0\nhi\n")?;
+    std::fs::write(&b, "size: 10x1  cursor: 0,0\nbye\n")?;
+
+    let out = Command::new(bin)
+        .args([
+            "render",
+            "--text",
+            a.to_str().expect("utf-8 path"),
+            b.to_str().expect("utf-8 path"),
+        ])
+        .output()?;
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("usage: termlens render"), "{stderr}");
+    assert!(
+        !String::from_utf8_lossy(&out.stdout).contains("bye"),
+        "the last operand must not win: {out:?}"
+    );
+
+    // `--out` is where the bug was invisible, so this is the case that
+    // matters: exit 2 and no file, not the wrong screen in the right one.
+    let shot = dir.join("shot.svg");
+    let out = Command::new(bin)
+        .args([
+            "render",
+            "--svg",
+            "--out",
+            shot.to_str().expect("utf-8 path"),
+            a.to_str().expect("utf-8 path"),
+            b.to_str().expect("utf-8 path"),
+        ])
+        .output()?;
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    assert!(
+        !shot.exists(),
+        "a refused render left a file behind: {}",
+        shot.display()
+    );
+
+    // A `-` beside a path is refused before stdin is read: the diagnostic
+    // is the usage, not a complaint about what the pipe carried.
+    let out = with_stdin(
+        &["render", "--text", "-", a.to_str().expect("utf-8 path")],
+        "not a saved screen\n",
+    );
+    assert_eq!(out.status.code(), Some(2), "{out:?}");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("usage: termlens render"), "{stderr}");
+    assert!(!stderr.contains("<stdin>"), "stdin was read: {stderr}");
+
+    // And one operand remains exactly the command it was.
+    let out = Command::new(bin)
+        .args(["render", "--text", a.to_str().expect("utf-8 path")])
+        .output()?;
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stdout).contains("hi"),
+        "{out:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
 /// The working directory is part of "how the program is normally run", and
 /// `TerminalBuilder::current_dir` had no way through to the command line
 /// (#312).

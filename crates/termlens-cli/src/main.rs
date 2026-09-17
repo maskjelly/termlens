@@ -362,7 +362,7 @@ fn colored(before: &Screen, after: &Screen, diff: &ScreenDiff) -> String {
 
 fn render(args: &[String]) -> ExitCode {
     let mut format: Option<&str> = None;
-    let mut file = None;
+    let mut files = Vec::new();
     let mut out_path: Option<&str> = None;
     let mut args = args.iter();
     while let Some(arg) = args.next() {
@@ -380,10 +380,12 @@ fn render(args: &[String]) -> ExitCode {
                     "unknown option {other:?} (try `termlens render --help`)"
                 ));
             }
-            _ => file = Some(arg.as_str()),
+            _ => files.push(arg),
         }
     }
-    let (Some(format), Some(file)) = (format, file) else {
+    // The operand is the whole input: two of them are ambiguous, and letting
+    // the last win is how a stale path renders a screen nobody named (#364).
+    let (Some(format), [file]) = (format, files.as_slice()) else {
         eprintln!("{RENDER_USAGE}");
         return ExitCode::from(2);
     };

@@ -172,6 +172,10 @@ reads that marker.
   and the ANSI rendering all put blink first. Serde reads by key, so every
   existing document still deserialises; only the emitted key order and the
   `Debug` order moved, and a test pins the order now (#381).
+- `termlens render` refuses anything but one file operand, printing its
+  usage and exiting 2, instead of silently rendering the last one. With
+  `--out` the wrong screen was written and nothing printed to reveal it,
+  and a stale path left on the line after an edit went unseen (#364).
 
 ## [0.11.1] - 2026-09-16
 
