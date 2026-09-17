@@ -13,17 +13,13 @@ doc="${2:-CONTRIBUTING.md}"
 # required-green's jq) and are not something a contributor types.
 ci_cmds="$(sed -n 's/^[[:space:]]*- run: \(cargo .*\)$/\1/p' "$ci" | sed -E 's/[[:space:]]+/ /g')"
 
-# CONTRIBUTING §1: every ```sh block between "## 1." and "## 2.", comments
-# stripped, the RUSTDOCFLAGS prefix and a `+toolchain` selector removed —
-# `cargo +1.85 check` in the doc is `cargo check` under RUSTUP_TOOLCHAIN
-# in the workflow. Extended regex throughout: BSD sed has no \\+ in basic.
-doc_cmds="$(awk '/^## 1\./{s=1} /^## 2\./{s=0} s' "$doc" \
-  | awk '/^```/{f=!f; next} f' \
-  | sed -E -e 's/#.*$//' \
-           -e "s/^RUSTDOCFLAGS='-D warnings' //" \
-           -e 's/^cargo \+[^ ]+ /cargo /' \
-           -e 's/[[:space:]]+/ /g' -e 's/^ //' -e 's/ $//' \
-  | grep -v '^$')"
+# CONTRIBUTING §1: the shared extraction in extract-gates.sh (#368), plus
+# the normalisations this comparison alone needs — the RUSTDOCFLAGS prefix
+# and a `+toolchain` selector removed, because `cargo +1.85 check` in the
+# doc is `cargo check` under RUSTUP_TOOLCHAIN in the workflow.
+doc_cmds="$("$(dirname "${BASH_SOURCE[0]}")/extract-gates.sh" "$doc" \
+  | sed -E -e "s/^RUSTDOCFLAGS='-D warnings' //" \
+           -e 's/^cargo \+[^ ]+ /cargo /')"
 
 status=0
 while IFS= read -r cmd; do

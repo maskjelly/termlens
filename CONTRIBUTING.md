@@ -32,7 +32,12 @@ cargo test --workspace --all-features   # the whole suite: unit + integration + 
 `--all-features` matters: `decode` is off by default, and without it the
 `decode` tests never build. That is the `test` job. CI gates on more than
 the test job, and every gate is reproducible locally — run these before
-pushing and nothing in CI should surprise you:
+pushing and nothing in CI should surprise you.
+[`tools/preflight.sh`](tools/preflight.sh) runs the whole list below in order
+and prints one line per gate; `--fast` narrows it to fmt, clippy and the test
+suite. A gate whose optional tooling is not installed — `cargo-deny`,
+`cargo-semver-checks`, `pipx`, the 1.85 toolchain, the Windows target — is
+skipped by name rather than failed.
 
 ```sh
 cargo fmt --all --check
@@ -63,6 +68,7 @@ cargo clippy --workspace --all-targets --all-features --target x86_64-pc-windows
 tools/semver-gate-selftest/run.sh                       # the semver gate can fail (cargo install cargo-semver-checks)…
 tools/link-gate-selftest/run.sh                         # …and so can the link gate, with no extra tooling
 tools/report-pin-gate-selftest/run.sh                   # …and the report-pin gate, likewise
+tools/preflight-selftest/run.sh                         # …and the runner accounts for each gate it runs, failures included
 .github/scripts/check-semver.sh 0.11.1                  # …and the public API is compatible with the last published release
 ```
 

@@ -193,6 +193,11 @@ jobs:
       # listed file that lost its ref, and one stale ref among two are all
       # asserted to go red.
       - run: tools/report-pin-gate-selftest/run.sh
+      # …and the preflight runner (#368): a fixture whose first gate fails
+      # and whose second passes must report both and exit non-zero, and an
+      # all-passing fixture must exit zero. Needs no toolchain, so it lives
+      # here with the other script gates.
+      - run: tools/preflight-selftest/run.sh
       # The emit fixture's documented steps against the ones it implements
       # (#318). It lives in this job because it needs no toolchain — it is
       # two greps and a `comm` — and the fixture is what almost every
