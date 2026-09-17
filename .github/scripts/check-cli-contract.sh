@@ -176,6 +176,21 @@ expect "inspect --cwd, missing directory" 2 "$BIN" inspect --cwd "$WORK/no-such-
 "$BIN" inspect --size 200x3 --cwd "$WORK" sh -c pwd > "$WORK/cwd.snap" 2>/dev/null || true
 contains "inspect --cwd runs the program there" "$(basename "$WORK")" "$WORK/cwd.snap"
 
+# The child environment is bare by default; --env sets a value in it and
+# --inherit-env hands the caller's over instead. Both decide which screen
+# the test sees, and a regression in either is silent (#367).
+expect "inspect --env, malformed pair" 2 "$BIN" inspect --env NO_EQUALS true
+# The empty key is the one case where splitting on the first `=` and on the
+# last disagree about whether to refuse, so this line holds the published
+# binary to the first-= parse in a way the value assertions cannot (#367).
+expect "inspect --env, empty key" 2 "$BIN" inspect --env '=a=b' true
+"$BIN" inspect --size 60x3 --env TERMLENS_CONTRACT=zzz sh -c 'echo "[$TERMLENS_CONTRACT]"' > "$WORK/env.snap" 2>/dev/null || true
+contains "inspect --env sets a variable"       "[zzz]" "$WORK/env.snap"
+TERMLENS_CONTRACT=zzz "$BIN" inspect --size 60x3 sh -c 'echo "[$TERMLENS_CONTRACT]"' > "$WORK/cleared.snap" 2>/dev/null || true
+contains "inspect clears the env by default"   "[]"    "$WORK/cleared.snap"
+TERMLENS_CONTRACT=zzz "$BIN" inspect --size 60x3 --inherit-env sh -c 'echo "[$TERMLENS_CONTRACT]"' > "$WORK/inherited.snap" 2>/dev/null || true
+contains "inspect --inherit-env keeps the caller's" "[zzz]" "$WORK/inherited.snap"
+
 # --- diff, which is the one command with three meaningful exit codes.
 expect "diff, same picture"        0 "$BIN" diff "$WORK/a.snap" "$WORK/a.snap"
 expect "diff, different pictures"  1 "$BIN" diff "$WORK/a.snap" "$WORK/b.snap"
