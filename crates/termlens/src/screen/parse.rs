@@ -150,12 +150,21 @@ fn parse_header(line: &str) -> Result<(u16, u16, (u16, u16, bool))> {
     Ok((cols, rows, cursor))
 }
 
-/// One grid line into `row`, a slice of exactly `cols` cells. Zero-width
-/// characters join the cell before them; a wide character takes two.
+/// One grid line into `row`, a slice of exactly `cols` cells. A zero-width
+/// combining mark joins the cell before it; a wide character takes two; a
+/// control character is an error.
 fn parse_row(line: &str, number: usize, cols: u16, row: &mut [Cell]) -> Result<()> {
     let mut col = 0usize;
     for ch in line.chars() {
-        let width = ch.width().unwrap_or(0);
+        // `unicode_width` answers `None` for a control character and
+        // `Some(0)` for a zero-width mark. Reading them alike folded an
+        // `ESC` into the cell before it, and the snapshot renderings then
+        // carried the raw byte out (#376).
+        let Some(width) = ch.width() else {
+            return Err(Error::Parse(format!(
+                "line {number}: {ch:?} is a control character; the snapshot format never writes one"
+            )));
+        };
         if width == 0 {
             // The cell that owns the glyph before this mark. A wide
             // character advanced the column by two, so one step back lands
@@ -399,6 +408,27 @@ mod tests {
             "\u{6771}\u{301}\u{302}"
         );
         assert!(many.cell(0, 3).unwrap().is_wide_continuation());
+    }
+
+    /// `unicode_width` answers `None` for a control character and `Some(0)`
+    /// for a combining mark, and only the second joins a cell (#376).
+    #[test]
+    fn a_control_character_is_refused_where_a_combining_mark_joins() {
+        for ch in ['\u{1b}', '\u{1}', '\t'] {
+            let input = format!("size: 8x1  cursor: 0,0\na{ch}b");
+            let err = Screen::parse(&input).unwrap_err();
+            assert!(matches!(err, Error::Parse(_)), "{ch:?}: {err}");
+            let text = err.to_string();
+            assert!(
+                text.contains("line 2") && text.contains(&format!("{ch:?}")),
+                "{ch:?}: {text}"
+            );
+        }
+        // A zero-width mark still joins the cell before it, the way it
+        // does after the wide character above.
+        let screen = Screen::parse("size: 8x1  cursor: 0,0\na\u{301}b").unwrap();
+        assert_eq!(screen.cell(0, 0).unwrap().contents(), "a\u{301}");
+        assert_eq!(screen.cell(0, 1).unwrap().contents(), "b");
     }
 
     /// `Display for Color` is the forward half of the token `parse_color`
