@@ -216,7 +216,7 @@ output back to the terminal stay testable.
 ```sh
 termlens inspect --size 120x40 myapp     # run a program, print its screen
 termlens diff old.snap new.snap.new      # the cell diff; exit 1 if anything changed
-termlens render --svg failing.snap       # a saved screen as SVG, HTML, ANSI or text
+termlens render --svg failing.snap       # a saved screen as SVG, HTML, ANSI, JSON or text
 termlens render --svg --out shot.svg -   # …to a file, from a screen on stdin
 ```
 

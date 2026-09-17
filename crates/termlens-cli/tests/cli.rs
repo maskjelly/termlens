@@ -156,6 +156,91 @@ fn render_writes_svg_html_ansi_and_text() -> termlens::Result<()> {
     Ok(())
 }
 
+/// `render --json` writes what `render --text` reads (#373): the format-1
+/// JSON document `docs/STABILITY.md` promises. The CLI could read the
+/// format and not write it, so the two promised saved-screen formats
+/// converted in one direction only.
+#[test]
+fn render_json_writes_the_document_render_text_reads_back() -> termlens::Result<()> {
+    use std::process::Command;
+    let bin = env!("CARGO_BIN_EXE_termlens");
+
+    let json = Command::new(bin)
+        .args(["render", "--json", &data("before.snap")])
+        .output()?;
+    assert_eq!(json.status.code(), Some(0), "{json:?}");
+    let document = String::from_utf8(json.stdout).expect("utf-8 JSON");
+    let value: serde_json::Value = serde_json::from_str(&document).expect("a JSON document");
+    assert_eq!(value["format"], 1, "{document}");
+    // The library reads its own document back, byte for byte.
+    let screen: Screen = serde_json::from_str(&document).expect("a termlens Screen");
+    assert_eq!(screen.size(), (30, 4));
+    assert_eq!(
+        document,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&screen).expect("serialize")
+        )
+    );
+
+    // text -> json -> text: the round trip through the two formats lands on
+    // the bytes the text rendering prints.
+    let from_text = Command::new(bin)
+        .args(["render", "--text", &data("before.snap")])
+        .output()?;
+    assert_eq!(from_text.status.code(), Some(0), "{from_text:?}");
+    let back = with_stdin(&["render", "--text", "-"], &document);
+    assert_eq!(back.status.code(), Some(0), "{back:?}");
+    assert_eq!(
+        back.stdout, from_text.stdout,
+        "json -> text is the same screen"
+    );
+
+    // --out carries exactly the bytes stdout did, and stdin is an input
+    // like any path: `render --json -` is `render --json before.snap`.
+    let dir = std::env::temp_dir().join(format!("termlens-render-json-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let written = dir.join("screen.json");
+    let out = Command::new(bin)
+        .args([
+            "render",
+            "--json",
+            "--out",
+            written.to_str().expect("utf-8 path"),
+            &data("before.snap"),
+        ])
+        .output()?;
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    assert!(out.stdout.is_empty(), "--out means not stdout: {out:?}");
+    assert_eq!(std::fs::read(&written)?, document.as_bytes());
+    let piped = with_stdin(&["render", "--json", "-"], &document);
+    assert_eq!(piped.status.code(), Some(0), "{piped:?}");
+    assert_eq!(piped.stdout, document.as_bytes(), "stdin is a path's equal");
+
+    // A JSON file renders through --json unchanged — format 1 in, the same
+    // document out.
+    let again = Command::new(bin)
+        .args(["render", "--json", written.to_str().expect("utf-8 path")])
+        .output()?;
+    assert_eq!(again.status.code(), Some(0), "{again:?}");
+    assert_eq!(
+        again.stdout,
+        document.as_bytes(),
+        "the JSON twin round-trips through the CLI"
+    );
+
+    let help = Command::new(bin).args(["render", "--help"]).output()?;
+    let usage = String::from_utf8_lossy(&help.stdout);
+    let first = usage.lines().next().expect("a usage line");
+    assert!(
+        first.contains("--json"),
+        "the usage line lists --json: {first}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(())
+}
+
 #[test]
 fn a_file_that_is_not_a_screen_exits_two_and_names_it() -> termlens::Result<()> {
     // Wide, so the path in the diagnostic is not wrapped across two rows.

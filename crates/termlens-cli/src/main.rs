@@ -29,7 +29,7 @@ usage: termlens <command> [options]
 commands:
   inspect [options] <program> [args…]  run a program in a PTY and print its screen
   diff [--color WHEN] <a> <b>          compare two saved screens; exit 1 when they differ
-  render --svg|--html|--ansi|--text [--out PATH] <a>  render a saved screen
+  render --svg|--html|--ansi|--text|--json [--out PATH] <a>  render a saved screen
 
 A saved screen is the snapshot text format termlens prints — what `inspect`
 writes to stdout, an insta .snap with or without its header, the block a
@@ -78,10 +78,11 @@ the plain one Screen::diff prints in a CI log. Exit code 0 when the two are
 the same picture, 1 when they differ, 2 when a file could not be read.";
 
 const RENDER_USAGE: &str = "\
-usage: termlens render (--svg | --html | --ansi | --text) [--out PATH] <a>
+usage: termlens render (--svg | --html | --ansi | --text | --json) [--out PATH] <a>
 
 Prints a saved screen as an SVG image, an HTML fragment, the screen in ANSI
-colour for a terminal, or the plain text format with its styles: block.
+colour for a terminal, the plain text format with its styles: block, or the
+format-1 JSON document the crate's `serde` feature writes.
 
 <a> may be `-`, meaning standard input. --out writes to PATH instead of
 stdout, and creates nothing when the render fails — unlike a shell
@@ -403,7 +404,7 @@ fn render(args: &[String]) -> ExitCode {
         match arg.as_str() {
             "-h" | "--help" => return print(&format!("{RENDER_USAGE}\n")),
             "--version" => return print(&version()),
-            "--svg" | "--html" | "--ansi" | "--text" => format = Some(arg.as_str()),
+            "--svg" | "--html" | "--ansi" | "--text" | "--json" => format = Some(arg.as_str()),
             "--out" => match args.next() {
                 Some(path) => out_path = Some(path.as_str()),
                 None => return fail("--out needs a PATH argument"),
@@ -431,6 +432,12 @@ fn render(args: &[String]) -> ExitCode {
         "--svg" => screen.to_svg(),
         "--html" => screen.to_html(),
         "--ansi" => screen.to_ansi(),
+        // Pretty-printed and newline-terminated, the shape the corpus
+        // commits: a saved screen a human diffs, and one `load` reads back.
+        "--json" => match serde_json::to_string_pretty(&screen) {
+            Ok(json) => format!("{json}\n"),
+            Err(e) => return fail(&format!("writing the JSON failed: {e}")),
+        },
         _ => format!("{}\n", screen.with_styles()),
     };
     // The file is created here, after the screen parsed, and not before
