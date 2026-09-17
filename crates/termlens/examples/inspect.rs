@@ -108,7 +108,20 @@ fn main() -> ExitCode {
     // program's own, however flag-like it looks.
     while args.peek().is_some_and(|a| a.starts_with('-') && a != "-") {
         let flag = args.next().unwrap_or_default();
-        let parsed = match flag.as_str() {
+        // `--flag=value` for the flags that take a value, mirroring the
+        // command this example follows: a value attached to a flag that
+        // takes none (`--inherit-env=nonsense`) falls through to the
+        // catch-all, which reports the whole token.
+        let (name, inline) = match flag.split_once('=') {
+            Some((name, value))
+                if matches!(name, "--size" | "--timeout" | "--idle" | "--cwd" | "--env") =>
+            {
+                (name, Some(value))
+            }
+            _ => (flag.as_str(), None),
+        };
+        let mut args = inline.map(str::to_owned).into_iter().chain(args.by_ref());
+        let parsed = match name {
             "-h" | "--help" => {
                 println!("{USAGE}");
                 return ExitCode::SUCCESS;

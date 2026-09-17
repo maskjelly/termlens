@@ -487,7 +487,24 @@ fn inspect(args: Vec<String>) -> ExitCode {
     // program's own, however flag-like it looks.
     while args.peek().is_some_and(|a| a.starts_with('-') && a != "-") {
         let flag = args.next().unwrap_or_default();
-        let parsed = match flag.as_str() {
+        // `--flag=value` is split only for the flags that take a value, so
+        // each keeps its own diagnostic for the spelling and the whole token
+        // stays in `flag` for the unknown-option message. A value attached
+        // to a flag that takes none (`--inherit-env=nonsense`) falls through
+        // to the catch-all and is refused there, as `render` refuses
+        // `--svg=1`; splitting it would apply the flag and drop the value.
+        let (name, inline) = match flag.split_once('=') {
+            Some((name, value))
+                if matches!(name, "--size" | "--timeout" | "--idle" | "--cwd" | "--env") =>
+            {
+                (name, Some(value))
+            }
+            _ => (flag.as_str(), None),
+        };
+        // The inline value first, then the next argument: `take` reads one
+        // stream, so both spellings parse and diagnose identically.
+        let mut args = inline.map(str::to_owned).into_iter().chain(args.by_ref());
+        let parsed = match name {
             "-h" | "--help" => return print(&format!("{INSPECT_USAGE}\n")),
             "--version" => return print(&version()),
             "--" => break,
@@ -526,8 +543,8 @@ fn inspect(args: Vec<String>) -> ExitCode {
                 (!key.is_empty()).then(|| (key.to_owned(), value.to_owned()))
             })
             .map(|pair| env.push(pair)),
-            other => Err(format!(
-                "unknown option {other:?} (try `termlens inspect --help`)"
+            _ => Err(format!(
+                "unknown option {flag:?} (try `termlens inspect --help`)"
             )),
         };
         if let Err(message) = parsed {

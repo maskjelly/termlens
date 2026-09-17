@@ -199,6 +199,30 @@ fn inspect_prints_its_usage_for_help_and_for_a_missing_program() {
         "an unknown option is refused rather than spawned:\n{}",
         String::from_utf8_lossy(&unknown.stderr)
     );
+
+    // `--flag=value` is for the flags that take a value; a value on a flag
+    // that takes none is refused with the whole token named, so the example
+    // and the command agree on the spelling they both gained (#366).
+    let sized = run_inspect(bin, &["--size=12x3", "sh", "-c", "stty size"]);
+    assert!(
+        sized.status.success(),
+        "the = spelling works as the two-argument form:\n{}",
+        String::from_utf8_lossy(&sized.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&sized.stdout);
+    assert!(
+        stdout.contains("3 12"),
+        "spawned at the given size:\n{stdout}"
+    );
+
+    let valued = run_inspect(bin, &["--inherit-env=nonsense", "sh"]);
+    assert_eq!(valued.status.code(), Some(2));
+    assert!(
+        String::from_utf8_lossy(&valued.stderr)
+            .contains("unknown option \"--inherit-env=nonsense\""),
+        "a value on a value-less flag names the whole token:\n{}",
+        String::from_utf8_lossy(&valued.stderr)
+    );
 }
 
 /// Both timings are flags now (#236): a malformed value is rejected in one

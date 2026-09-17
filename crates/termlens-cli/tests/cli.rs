@@ -249,6 +249,105 @@ fn inspect_prints_the_screen_and_the_exit_trailer() -> termlens::Result<()> {
         "{}",
         t.screen()
     );
+
+    // The `=` spelling reaches the same parse, so it keeps the same
+    // diagnostic, naming the flag the user typed and not the whole token.
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        args(["inspect", "--size=12", "sh"])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(2));
+    assert!(
+        t.screen()
+            .contains("bad --size \"12\", expected e.g. 120x40"),
+        "{}",
+        t.screen()
+    );
+    Ok(())
+}
+
+/// The `--flag=value` spelling beside the two-argument one, as `diff
+/// --color=` and `render --out=` already have it (#366).
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_accepts_the_flag_equals_value_spelling() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size=60x3",
+            "--timeout=5",
+            "--idle=100",
+            "sh",
+            "-c",
+            "printf 'hi there'"
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let s = t.screen();
+    assert!(s.contains("size: 60x3") && s.contains("hi there"), "{s}");
+    Ok(())
+}
+
+/// `--flag=value` is for the flags that take a value; a value attached to a
+/// flag that takes none is refused with the whole token named, as `render`
+/// refuses `--svg=1`. Splitting every long flag would apply `--inherit-env`
+/// and drop the `nonsense`, which is the silent-wrong-answer shape the
+/// spelling was added to avoid (#366).
+#[test]
+fn inspect_refuses_a_value_on_a_flag_that_takes_none() -> termlens::Result<()> {
+    let mut t = termlens::bin!(
+        "termlens",
+        args(["inspect", "--inherit-env=nonsense", "/bin/echo", "hi"])
+    )?;
+    let status = t.wait_exit()?;
+    assert_eq!(status.code(), Some(2), "{}", t.screen());
+    let s = t.screen();
+    assert!(
+        s.contains(r#"unknown option "--inherit-env=nonsense""#),
+        "the diagnostic names the whole token: {s}"
+    );
+    Ok(())
+}
+
+/// `--env=KEY=VALUE` splits on the *first* `=` only, and `--cwd=PATH` runs
+/// the program where it says, exactly as their two-argument forms do (#366).
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_env_equals_splits_on_the_first_equals() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    // A directory made here, so the assertion is not about /tmp's own name
+    // on a platform that symlinks it (macOS: /tmp -> /private/tmp).
+    let dir = std::env::temp_dir().join(format!("termlens-eq-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let real = std::fs::canonicalize(&dir)?;
+    // Wide enough that the path is one row, as in the two-argument test.
+    let cwd = format!("--cwd={}", dir.display());
+    let mut t = termlens::bin!(
+        "termlens",
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size=200x3",
+            &cwd,
+            "--env=A=b=c",
+            "sh",
+            "-c",
+            "echo \"[$A] $(pwd)\""
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let s = t.screen();
+    assert!(s.contains("[b=c]"), "the value keeps its second `=`: {s}");
+    assert!(
+        s.contains(real.to_str().expect("utf-8 path")),
+        "the program ran in {}: {s}",
+        real.display()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
     Ok(())
 }
 
