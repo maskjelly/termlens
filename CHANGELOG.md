@@ -56,6 +56,12 @@ reads that marker.
   refuses to open, and `to_ansi` clear the screen of the reader it was
   printed to; a combining mark still joins its cell as before (#376).
 
+- `Screen::diff` frames a row of wide characters with `│` at the same
+  display column on the text line and on the marker line. The row columns
+  were padded with `{:<width$}`, which counts `char`s, so a CJK or emoji
+  row pushed the text line's `│` right of the marker line's; both now pad
+  by display width (#380).
+
 - `Screen::to_svg` and `Screen::to_html` render blink (`SGR 5`) instead of
   dropping it (#378). Every other `Style` attribute already reached all
   three renderings, so a blinking cell produced the very same SVG and HTML
