@@ -79,7 +79,11 @@ CHANGELOG entry.
   into pixels. It still draws none: an image never reaches the screen grid,
   so what a picture looks like *composited over the text under it* is not
   assertable, and `f=100` (PNG) payloads are reported unsupported rather
-  than decoded, since termlens carries no image codec. Retention is bounded
+  than decoded, since termlens carries no image codec. A kitty `t=f`, `t=t`
+  or `t=s` transmission is captured and reported unsupported rather than
+  decoded: its body is a path or a shared-memory name, not pixels, and
+  termlens never opens what a program under test points at. An unknown
+  `t=` is refused on the same ground. Retention is bounded
   (4 MiB by default, `capture_graphics`); past it a payload is counted and
   described but its bytes are dropped, and it says so rather than decoding a
   prefix of itself. Support stays opt-in, so by default an application that
