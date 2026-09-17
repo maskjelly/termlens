@@ -355,7 +355,8 @@ starting: every change lands with tests; anything touching wait semantics
 must pass the 100-iteration [stress workflow](https://github.com/vyncint/termlens/blob/main/.github/workflows/stress.yml)
 on Linux, macOS and Windows; snapshot updates are reviewed diffs
 (`cargo insta review`), never blind accepts. Security reports go to
-[SECURITY.md](https://github.com/vyncint/termlens/blob/main/SECURITY.md).
+[SECURITY.md](https://github.com/vyncint/termlens/blob/main/SECURITY.md);
+usage questions go to [Discussions Q&A](https://github.com/vyncint/termlens/discussions/new?category=q-a).
 
 ## License
 
