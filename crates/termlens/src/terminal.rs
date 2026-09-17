@@ -712,6 +712,12 @@ impl RecordingState {
 /// A recording in progress: every complete frame from
 /// [`Terminal::record`] on, timestamped, until [`stop`](Self::stop).
 ///
+/// Dropping it also stops the recording — the deregistration `stop`
+/// performs — so a recorder abandoned by an early return or a `?` before
+/// `stop` does not leave the reader thread cloning every repaint into a
+/// buffer no one can read (#396). The frames are dropped with it; only
+/// `stop` hands back a [`Recording`].
+///
 /// Holds no borrow of the terminal, so the test drives it — `send`,
 /// `wait_frame` — while the recording runs.
 pub struct Recorder {
@@ -742,12 +748,7 @@ impl Recorder {
     /// gives. A recording is made of complete frames; sampling the grid on a
     /// timer instead would be the torn-frame problem in a new hat.
     pub fn stop(self) -> Result<Recording> {
-        let frames_seen = self.shared.mutate(|state| {
-            state
-                .recorders
-                .retain(|recorder| !Arc::ptr_eq(recorder, &self.state));
-            state.frames_seen
-        });
+        let frames_seen = self.deregister();
         let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         if frames_seen == 0 {
             return Err(Error::Input(
@@ -764,6 +765,30 @@ impl Recorder {
             dropped: state.dropped,
             title: self.title.clone(),
         })
+    }
+
+    /// Take this recorder out of the reader thread's delivery list, and
+    /// report how many complete frames the terminal has seen in total.
+    ///
+    /// One definition for the two callers — `stop`, and `Drop` when a
+    /// recorder is abandoned before `stop` — so the two cannot deregister
+    /// by different rules.
+    fn deregister(&self) -> u64 {
+        self.shared.mutate(|state| {
+            state
+                .recorders
+                .retain(|recorder| !Arc::ptr_eq(recorder, &self.state));
+            state.frames_seen
+        })
+    }
+}
+
+impl Drop for Recorder {
+    /// Deregister as `stop` does. `stop` runs this and then drops `self`,
+    /// so a stopped recorder deregisters twice; the second call finds no
+    /// match and is a no-op.
+    fn drop(&mut self) {
+        self.deregister();
     }
 }
 
@@ -2600,7 +2625,9 @@ impl Terminal {
     /// synchronized updates, and only those. Bounded by
     /// [`record_budget`](TerminalBuilder::record_budget), oldest frames
     /// dropped and the drop reported. The recorder holds no borrow of the
-    /// terminal; drive the application as usual while it runs.
+    /// terminal; drive the application as usual while it runs, and drop it
+    /// — or [`stop`](Recorder::stop) it — when the recording is over; a
+    /// recorder that goes out of scope stops collecting.
     pub fn record(&mut self) -> Recorder {
         let state = Arc::new(Mutex::new(RecordingState {
             started: Instant::now(),
@@ -3068,7 +3095,7 @@ impl Terminal {
         if modes.mouse_encoding == MouseEncoding::Sgr {
             return Ok(mouse_sgr(button, col, row, press));
         }
-        if col > 222 || row > 222 {
+        if modes.mouse_encoding == MouseEncoding::Legacy && (col > 222 || row > 222) {
             return Err(Error::Input(format!(
                 "({col}, {row}) is unrepresentable in the legacy mouse \
                  encoding the application selected (max 222)"

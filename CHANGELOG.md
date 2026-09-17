@@ -56,6 +56,88 @@ reads that marker.
   refuses to open, and `to_ansi` clear the screen of the reader it was
   printed to; a combining mark still joins its cell as before (#376).
 
+- `Screen::diff` frames a row of wide characters with `│` at the same
+  display column on the text line and on the marker line. The row columns
+  were padded with `{:<width$}`, which counts `char`s, so a CJK or emoji
+  row pushed the text line's `│` right of the marker line's; both now pad
+  by display width (#380).
+
+- `Screen::unsupported()` preserves parameterless CSI sequences in their
+  written
+  form instead of inserting a synthetic `0` parameter (#394).
+
+- `Screen::unsupported()` reports the xterm title-stack operations
+  `CSI 22 t` and `CSI 23 t`, which were silently dropped (#393). The whole
+  `CSI … t` family was exempt from the record on the grounds that the
+  responder handles it, but the responder only answers the three size
+  reports and names five more in a timeout; push and pop are honoured by
+  nobody. A program that brackets its run with them left `Screen::title()`
+  reporting the pushed-away title and `unsupported()` empty — the pairing
+  the accessor exists to prevent.
+
+- `Screen::to_svg` and `Screen::to_html` render blink (`SGR 5`) instead of
+  dropping it (#378). Every other `Style` attribute already reached all
+  three renderings, so a blinking cell produced the very same SVG and HTML
+  as a steady one — and blink is the attribute the shadow parser exists to
+  recover, so the regression was invisible in exactly the artefact a
+  reviewer looks at. The SVG gets an `<animate>` child on the blinking
+  `<text>`; the HTML gets a `termlens-blink` keyframes rule in a `<style>`
+  element inside the `<pre>`, written only when a run blinks, animating
+  the glyph's colour so a dim blink keeps its dim and the background keeps
+  painting.
+
+- A cursor pending wrap at the right margin is reported on the last cell
+  rather than one column past it (#401). vt100 parks it at `col == cols`;
+  no real terminal reports a column its own width does not have, and the
+  snapshot format refuses one — so a program that filled its last row made
+  `termlens inspect` print a screen `render` and `diff` would not read. The
+  cursor-position report and a graphics placement at the margin were off by
+  the same column. Tab stops still read the raw column, so `HTS` at the
+  margin is dropped rather than clamped onto the last cell.
+
+- The JSON reader refuses a cursor one column past the right edge, as the
+  text parser always did (#375). The column bound was `>` where the row
+  bound beside it was `>=`, so `col == cols` — a column that does not
+  exist — passed validation, and `termlens render --text` turned a JSON
+  file it had accepted into a text file its own parser then refused. The
+  shape this stops reading is the pending-wrap position (`col == cols`),
+  which a screen taken from a live terminal can carry after a write fills
+  the last column; no file in the compatibility corpus holds one. The
+  writers that emit it are not touched here.
+
+- A hard reset (`ESC c`, RIS) no longer drops scrollback rows. The reset
+  rebuilt the backend's screen and emptied its history while the
+  high-water mark of rows already captured survived, so rows scrolling
+  after it were compared against a stale mark and skipped — and which
+  rows were lost depended on how the PTY chunked the writes (#391). Rows
+  that scrolled before the reset are now taken before the reset reaches
+  the screen, and the mark starts over afterwards.
+
+- XTVERSION probes are named in unanswered-query timeout diagnostics (#403).
+
+- The 222-coordinate ceiling applies only to the legacy mouse encoding
+  (#395). `CSI ?1005h` exists precisely so a coordinate above 222 can be
+  sent as a UTF-8 scalar, and termlens already encoded it correctly — the
+  guard simply ran before the encoding was consulted. So a click on the
+  right half of a wide terminal was refused against an application that
+  had chosen 1005, and the refusal named an encoding the application had
+  not selected.
+
+- `Screen::logical_text()` keeps the blank rows above the first row with
+  content, so on a screen with no wraps it is `Screen::text()` exactly —
+  leading blanks and an all-blank screen included. A TUI that left its top
+  row blank had every logical line shifted up, since trailing blank rows
+  were kept and leading ones were not. (#377)
+
+- A `Recorder` dropped without `stop()` stops collecting frames (#396). An
+  early return, a `?` or a panic between `record()` and `stop()` left the
+  reader thread cloning a whole grid into the recorder on every repaint,
+  filling its 2M-cell budget — about 200 MB once measured — for the
+  life of
+  the terminal, while the test that paid for it was whichever one ran
+  longest afterwards. Dropping a recorder now deregisters it exactly as
+  `stop` does.
+
 - `Terminal::resize` to the size the grid already has is a true no-op: no
   `TIOCSWINSZ`, no `SIGWINCH`, and the frame cursor stays where it was, so
   the `wait_frame` its rustdoc recommends still sees the frame the

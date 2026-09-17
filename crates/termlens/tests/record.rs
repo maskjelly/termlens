@@ -2,6 +2,8 @@
 //! bounded, honest about drops, refusing an application without
 //! synchronized updates, and exportable as asciicast v2 (#254).
 
+use std::alloc::{GlobalAlloc, Layout, System};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use termlens::{Key, Terminal};
@@ -301,6 +303,111 @@ fn the_asciicast_header_dates_and_names_the_recording() -> termlens::Result<()> 
     assert_eq!(parsed["width"], 40);
     assert_eq!(parsed["height"], 6);
     assert_eq!(parsed["env"]["TERM"], "xterm-256color");
+
+    t.send(Key::Enter)?;
+    assert!(t.wait_exit()?.success());
+    Ok(())
+}
+
+/// Live heap bytes in this test process, for the dropped-recorder test
+/// below.
+///
+/// What #396 costs is *retention*, not allocation: the reader clones a
+/// `Screen`, which shares its grid through an `Arc`, so a recorder that is
+/// never deregistered allocates nothing new — it simply never lets the
+/// frames go. RSS is the platform's measure of that and the process's own
+/// allocator counters are the portable one. The trait's default
+/// `realloc`/`alloc_zeroed` go through these two methods, so the count
+/// stays exact.
+static LIVE_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+struct CountingHeap;
+
+#[allow(unsafe_code)]
+unsafe impl GlobalAlloc for CountingHeap {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let ptr = System.alloc(layout);
+        if !ptr.is_null() {
+            LIVE_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+        }
+        ptr
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        System.dealloc(ptr, layout);
+        LIVE_BYTES.fetch_sub(layout.size(), Ordering::Relaxed);
+    }
+}
+
+#[global_allocator]
+static HEAP: CountingHeap = CountingHeap;
+
+fn live_bytes() -> usize {
+    LIVE_BYTES.load(Ordering::SeqCst)
+}
+
+/// A recorder dropped without `stop` stops collecting (#396). The
+/// idiomatic `let r = t.record(); … t.wait_frame(…)?; r.stop()?` abandons
+/// the recorder on any `?` or panic in between; without a `Drop`
+/// deregistration the reader thread kept cloning a whole grid per repaint
+/// into it, filling the default 2M-cell budget — 200 MB once measured —
+/// until the terminal was dropped.
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "ConPTY closes a DEC 2026 bracket before the content it wrapped, so a recorded frame never holds what was drawn (#149)"
+)]
+fn a_dropped_recorder_stops_collecting_frames() -> termlens::Result<()> {
+    const FRAME: &str = r"\e[?2026h\e[H\e[2JTICK\e[?2026l";
+    const FRAMES: usize = 64;
+    // With the leak, one phase holds 64 200x50 grids — 640k cells, under
+    // the default budget, so none is dropped for being over it. The slack
+    // covers the test binary's own churn with room to spare in both
+    // directions.
+    const SLACK: usize = 8 * 1024 * 1024;
+
+    let mut steps: Vec<&str> = vec!["READY", "--wait"];
+    for _ in 0..(2 * FRAMES + 1) {
+        steps.extend(["--raw", FRAME, "--wait"]);
+    }
+    let mut t = common::spawn_emit(
+        Terminal::builder()
+            .size(200, 50)
+            .timeout(Duration::from_secs(10)),
+        &steps,
+    )?;
+    t.wait_until(|s| s.contains("READY"))?;
+
+    // What the same number of frames costs with no recorder at all: the
+    // frame ring is eight grids deep and full by the end of this, so the
+    // frames themselves stop being the growth.
+    let before = live_bytes();
+    for _ in 0..FRAMES {
+        t.send(Key::Enter)?;
+        t.wait_frame(|s| s.contains("TICK"))?;
+    }
+    let control = live_bytes().saturating_sub(before);
+
+    drop(t.record());
+    let before = live_bytes();
+    for _ in 0..FRAMES {
+        t.send(Key::Enter)?;
+        t.wait_frame(|s| s.contains("TICK"))?;
+    }
+    let dropped = live_bytes().saturating_sub(before);
+    assert!(
+        dropped <= control + SLACK,
+        "a dropped recorder must not keep collecting: control grew {control} bytes, \
+         dropped grew {dropped} bytes"
+    );
+
+    // And it does not shadow a later recording: that one holds the frame
+    // drawn after it started, and only that one.
+    let kept = t.record();
+    t.send(Key::Enter)?;
+    t.wait_frame(|s| s.contains("TICK"))?;
+    let recording = kept.stop()?;
+    assert_eq!(recording.len(), 1, "only the frames this recorder saw");
 
     t.send(Key::Enter)?;
     assert!(t.wait_exit()?.success());
