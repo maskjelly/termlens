@@ -76,6 +76,13 @@ reads that marker.
   shadow's stream let that parser swallow the next printable character: a
   debug build panicked on the divergence, and a release build read blink,
   conceal or strikethrough from the wrong cell (#390).
+- `termlens inspect` ends its wait on whichever comes first — the program
+  exits, or its output has been silent for `--idle` — instead of waiting
+  the whole `--timeout` and only then consulting `--idle` (#374). A TUI
+  that never exits paid the full deadline on every run, however complete
+  the screen already was: 6.07s for a screen done in 1ms, in the issue's
+  reproduction. Both the trailers and the exit codes are unchanged, and the
+  wait is still bounded by `--timeout`.
 
 - A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
   instead of having its body decoded as pixels (#402). The body of those

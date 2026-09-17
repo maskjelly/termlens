@@ -1096,21 +1096,20 @@ fn inspect_env_sets_a_variable_and_splits_on_the_first_equals() -> termlens::Res
     Ok(())
 }
 
-/// `--idle` is the settle window after a `--timeout` deadline: output that
-/// arrives inside it is on the snapshot, output after it is not (#367). A
-/// regression here would be someone else's flake, so this test pins both
-/// sides of the window.
+/// `--idle` is the settle window that ends the wait, and `--timeout` is its
+/// one bound: output that arrives after the window, or after the deadline,
+/// is not on the snapshot (#367, #374). A regression here would be someone
+/// else's flake, so this test pins both sides of the window.
 #[test]
 #[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
 fn inspect_idle_window_decides_what_the_deadline_snapshot_holds() -> termlens::Result<()> {
     let path = std::env::var("PATH").unwrap_or_default();
     // `first` lands well before the 3s deadline, `second` four seconds in.
-    // The two sides: a window already satisfied at the deadline (300 ms of
-    // silence against nearly 3 s of it) ends the wait there with `first`
-    // only, while a five-second window sits above the timeout, so the wait's
-    // bound is what ends it — after `second` has arrived and before the
-    // silence could ever be satisfied — and the screen holds both. Neither
-    // side races the 4 s mark that way.
+    // The two sides: a 300 ms window is satisfied a moment after `first`,
+    // ending the wait there with `first` only; a five-second window can
+    // never be satisfied inside the deadline, so the deadline ends the wait
+    // — still with `first` only, because `second` lands a second after it.
+    // Neither side races the 4 s mark that way.
     // The trailing `sleep` keeps the child alive after its last write: a
     // write-then-exit races the platform's PTY teardown and the final bytes
     // can be lost (docs/DESIGN.md).
@@ -1146,9 +1145,23 @@ fn inspect_idle_window_decides_what_the_deadline_snapshot_holds() -> termlens::R
         "the gap sits outside the window: {s}"
     );
 
+    let started = std::time::Instant::now();
     let mut t = run("5000")?;
     assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
-    assert!(t.screen().contains("first second"), "{}", t.screen());
+    assert!(
+        !t.screen().contains("second"),
+        "the deadline ends the wait before the overdue window: {}",
+        t.screen()
+    );
+    // The deadline is the one bound: resolving there, not three seconds then
+    // a five-second window on top (which used to hold `second`, four seconds
+    // in, and return around eight). The ceiling is generous; the spawn is
+    // covered by the harness deadline (CONTRIBUTING §3).
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(6),
+        "returned after {:?}: the deadline did not bound the idle window",
+        started.elapsed()
+    );
     Ok(())
 }
 
@@ -1187,6 +1200,175 @@ fn inspect_timeout_snapshots_a_program_that_outlives_it() -> termlens::Result<()
     assert!(
         s.contains("--- still running at the deadline (killed on exit) ---"),
         "{s}"
+    );
+    Ok(())
+}
+
+/// The idle window ends the wait, not the deadline (#374). A program that
+/// paints once and sleeps is a TUI in miniature: `--idle 200` must end the
+/// wait, where the sequential version charged the whole `--timeout` and
+/// only then looked at `--idle` — six seconds for a screen complete in a
+/// millisecond. The ceiling is generous, and the harness deadline sixty
+/// times it, so this goes red only if the wait itself moved; the harness
+/// timeout also covers the spawn (CONTRIBUTING §3).
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_resolves_on_the_idle_window_before_the_deadline() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let started = std::time::Instant::now();
+    let mut t = termlens::bin!(
+        "termlens",
+        timeout(std::time::Duration::from_secs(60)),
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size",
+            "20x3",
+            "--idle",
+            "200",
+            "--timeout",
+            "30",
+            "sh",
+            "-c",
+            "printf READY; sleep 300"
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let elapsed = started.elapsed();
+    let s = t.screen();
+    assert!(
+        s.contains("READY"),
+        "the output before idleness is kept: {s}"
+    );
+    assert!(
+        s.contains("--- still running at the deadline (killed on exit) ---"),
+        "the program never exited, so the trailer says so: {s}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(10),
+        "took {elapsed:?}: the 200ms idle window did not end the wait before the 30s deadline"
+    );
+    Ok(())
+}
+
+/// The other arm of the race (#374): an exit still wins, promptly and with
+/// the exited trailer, even when `--idle` is far longer than the deadline —
+/// the fix must not turn a program that prints and exits into one held for
+/// the silence window.
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_reports_an_exit_without_waiting_for_the_idle_window() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let started = std::time::Instant::now();
+    let mut t = termlens::bin!(
+        "termlens",
+        timeout(std::time::Duration::from_secs(30)),
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size",
+            "20x3",
+            "--idle",
+            "30000",
+            "--timeout",
+            "30",
+            "sh",
+            "-c",
+            "printf 'done here'"
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let elapsed = started.elapsed();
+    let s = t.screen();
+    assert!(
+        s.contains("done here"),
+        "the final output is the screen: {s}"
+    );
+    assert!(s.contains("--- exited: exit code 0 ---"), "{s}");
+    assert!(
+        elapsed < std::time::Duration::from_secs(10),
+        "took {elapsed:?} for a program that exited at once"
+    );
+    Ok(())
+}
+
+/// The deadline is still the bound when the idle window never opens (#374):
+/// a program that keeps talking is snapshotted where it stands and reported
+/// as still running, and the wait is not cut short by the fix. The 1s
+/// deadline is the wait that must expire, and the child keeps it from
+/// opening — the outer deadline stays generous all the same.
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_chatter_waits_for_the_deadline_and_says_still_running() -> termlens::Result<()> {
+    let path = std::env::var("PATH").unwrap_or_default();
+    let started = std::time::Instant::now();
+    let mut t = termlens::bin!(
+        "termlens",
+        timeout(std::time::Duration::from_secs(30)),
+        env("PATH", &path),
+        args([
+            "inspect",
+            "--size",
+            "20x3",
+            "--idle",
+            "500",
+            "--timeout",
+            "1",
+            "sh",
+            "-c",
+            "while :; do printf x; sleep 0.01; done"
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0), "{}", t.screen());
+    let elapsed = started.elapsed();
+    let s = t.screen();
+    assert!(
+        s.contains("--- still running at the deadline (killed on exit) ---"),
+        "{s}"
+    );
+    assert!(
+        elapsed >= std::time::Duration::from_millis(800),
+        "returned after {elapsed:?}: the 1s deadline was not waited"
+    );
+    Ok(())
+}
+
+/// A child that closes its terminal but keeps running is not an exited
+/// child: the EOF ends the idle wait, but the reap that answers "exited"
+/// never comes, so the trailer must say still running (#374). The reap
+/// grace a genuinely exited child is given must not mislabel this one.
+#[test]
+#[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
+fn inspect_reports_still_running_when_the_child_closes_its_terminal() -> termlens::Result<()> {
+    use std::process::Command;
+    let bin = env!("CARGO_BIN_EXE_termlens");
+    let started = std::time::Instant::now();
+    let out = Command::new(bin)
+        .args([
+            "inspect",
+            "--size",
+            "20x3",
+            "--timeout",
+            "30",
+            "sh",
+            "-c",
+            "exec 0<&- 1>&- 2>&-; exec sleep 30",
+        ])
+        .output()?;
+    assert!(out.status.success(), "{out:?}");
+    let stderr = String::from_utf8(out.stderr).expect("utf-8");
+    assert_eq!(
+        stderr.trim_end(),
+        "--- still running at the deadline (killed on exit) ---",
+        "{stderr:?}"
+    );
+    // It returned on the EOF, not the 30s deadline: the reap grace is the
+    // only wait left, and the ceiling is generous for the spawn
+    // (CONTRIBUTING §3).
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(10),
+        "returned after {:?}: the EOF did not end the wait",
+        started.elapsed()
     );
     Ok(())
 }

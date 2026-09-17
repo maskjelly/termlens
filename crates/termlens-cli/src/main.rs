@@ -49,12 +49,13 @@ usage: termlens inspect [--size COLSxROWS] [--timeout SECONDS] [--idle MILLIS]
                         [--cwd PATH] [--inherit-env] [--ansi]
                         [--env KEY=VALUE]... <program> [args…]
 
-Runs <program> in an 80x24 pseudo-terminal (or --size), waits for it to
-exit or for the deadline (--timeout, default 5 seconds), and prints the
-rendered screen. A program still running at the deadline is snapshotted
-after --idle milliseconds (default 300) of output silence, then killed.
-The child environment is cleared by default except for PATH; --inherit-env
-keeps the caller's environment, and repeatable --env sets selected values.
+Runs <program> in an 80x24 pseudo-terminal (or --size) and prints the
+rendered screen. The wait ends on whichever comes first: the program
+exits, or its output has been silent for --idle milliseconds (default
+300), bounded by --timeout (default 5 seconds); a program still running
+when it ends is killed. The child environment is cleared by default
+except for PATH; --inherit-env keeps the caller's environment, and
+repeatable --env sets selected values.
 --cwd runs the program in PATH, which must be an existing directory.
 --ansi paints the screen in colour instead of the plain text format.
 
@@ -168,6 +169,16 @@ fn load(path: &str) -> Result<Screen, String> {
 const STDIN: &str = "-";
 /// What a diagnostic calls it, since `-: ...` reads as a stray flag.
 const STDIN_NAME: &str = "<stdin>";
+
+/// How long `inspect` gives the reap to land after the EOF that ended the
+/// idle wait. The kernel can report the terminal's close a scheduling hair
+/// before the child's status becomes collectable — the stress run caught
+/// the gap (#374, iteration 3 of 25 on a loaded 16-thread runner) — and the
+/// trailer should say exited when the program did exit. The same width the
+/// library gives its own post-reap drain, for the same reason. Only ever
+/// paid by a child that is genuinely still running, and only after the wait
+/// itself has ended.
+const REAP_GRACE: Duration = Duration::from_millis(500);
 
 /// A file operand as a diagnostic should name it.
 fn name_of(path: &str) -> &str {
@@ -602,15 +613,26 @@ fn inspect(args: Vec<String>) -> ExitCode {
     // while a human at a terminal still sees both. Before 0.11 the trailer
     // followed the screen on stdout and no CLI route produced a file the
     // CLI would accept.
-    let trailer = match t.wait_exit() {
-        Ok(status) => format!("--- exited: {status} ---"),
-        Err(termlens::Error::Timeout { .. }) => {
-            // Still running at the deadline: settle on a quiet screen
-            // instead, bounded by the deadline too unless the silence window
-            // asked for is itself longer.
-            let _ = t.wait_idle_for(idle, timeout.max(idle));
-            "--- still running at the deadline (killed on exit) ---".to_owned()
-        }
+    //
+    // Resolve on whichever comes first — the program exits, or its output
+    // has been silent for `idle` — under the one deadline (#374). Waiting
+    // for the exit first charged the full `--timeout` to every TUI that
+    // never exits, however complete the screen already was. `wait_idle_for`
+    // is that race, not half of it: it also resolves on the EOF that says
+    // the child is gone, and its deadline is applied once. The reaping
+    // probe then says which arm fired; it only reaps (and drains the final
+    // bytes) when the child is already gone, so an exit lands on its own
+    // trailer with the finished screen.
+    let still_running = "--- still running at the deadline (killed on exit) ---";
+    let trailer = match t.wait_idle_for(idle, timeout) {
+        Ok(()) => match t.wait_exit_for(REAP_GRACE) {
+            Ok(status) => format!("--- exited: {status} ---"),
+            Err(termlens::Error::Timeout { .. }) => still_running.to_owned(),
+            Err(e) => format!("--- waiting for the program failed: {e} ---"),
+        },
+        // Output never went silent for `idle`: the deadline ended the wait,
+        // which is the same trailer the sequential wait produced.
+        Err(termlens::Error::Timeout { .. }) => still_running.to_owned(),
         Err(e) => format!("--- waiting for the program failed: {e} ---"),
     };
     let code = print(&format!("{}\n", inspect_render(&t.screen(), ansi)));
