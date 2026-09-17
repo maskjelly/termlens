@@ -85,7 +85,10 @@ jobs:
       # The pull-request template is read in a pull request body, where a
       # relative link resolves against the pull request's URL; its two
       # checklist links were 404s in every pull request that used it (#369).
-      - run: .github/scripts/check-readme-links.sh README.md CONTRIBUTING.md .github/PULL_REQUEST_TEMPLATE.md
+      # The docs and the agent skill are checked too: their relative links
+      # resolve against the file, and three in docs/LIMITATIONS.md pointed at
+      # docs/docs/… unseen while the gate resolved against the root (#384).
+      - run: .github/scripts/check-readme-links.sh README.md CONTRIBUTING.md .github/PULL_REQUEST_TEMPLATE.md docs/*.md skills/termlens/SKILL.md
       # The screens of whatever failed, in the step summary (#251). The
       # suite dogfoods the action with the CLI from this tree.
       - uses: ./.github/actions/report

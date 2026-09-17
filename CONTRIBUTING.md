@@ -48,7 +48,7 @@ cargo test -p termlens --no-default-features --features serde
 cargo test --workspace                                   # default features
 cargo build -p termlens-cli                              # then the CLI's documented exit codes:
 .github/scripts/check-cli-contract.sh target/debug/termlens
-.github/scripts/check-readme-links.sh README.md CONTRIBUTING.md .github/PULL_REQUEST_TEMPLATE.md   # every in-repo link target exists; the packaged README and the pull-request template may not use relative ones
+.github/scripts/check-readme-links.sh README.md CONTRIBUTING.md .github/PULL_REQUEST_TEMPLATE.md docs/*.md skills/termlens/SKILL.md   # every in-repo link target exists, resolved against the linking file's directory; the packaged README and the pull-request template may not use relative ones
 .github/scripts/check-emit-steps.sh                      # the emit fixture documents exactly the steps it implements
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features

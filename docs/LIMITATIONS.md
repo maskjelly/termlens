@@ -65,7 +65,7 @@ CHANGELOG entry.
 - `wait_frame` needs the application to bracket its repaints in DEC 2026
   synchronized updates, and only the last 8 completed frames are retained;
   everything else waits with `wait_until`, under the three rules in
-  [docs/DESIGN.md](docs/DESIGN.md) §2.
+  [DESIGN.md](DESIGN.md) §2.
 - Some questions stay deliberately unanswered — kitty's `CSI ? u`, DECRQSS,
   DA3, `OSC 12`, `OSC 52` *reads*, and the non-pixel `CSI … t` reports —
   because a guessed reply is worse than none. An application blocked on one
@@ -155,7 +155,7 @@ CHANGELOG entry.
   the reason in the attribute; the probe that measured all of this is
   `tests/conpty_probe.rs`, and the `windows` workflow re-runs it on demand.
   The `windows-latest` leg is a required check. This is decision 1 of
-  [docs/STABILITY.md](docs/STABILITY.md).
+  [STABILITY.md](STABILITY.md).
 
 ## Process lifetime and Unicode
 
@@ -163,6 +163,6 @@ CHANGELOG entry.
   output to the OS PTY teardown (macOS especially). Long-lived TUIs are
   unaffected; for run-and-exit programs, end the script with a `read` and
   release it after asserting — see the "instant-exit caveat" in
-  [docs/DESIGN.md](docs/DESIGN.md).
+  [DESIGN.md](DESIGN.md).
 - Exotic grapheme clusters render as the vt100 crate renders them; the
   unicode-torture fixture pins the current behavior.

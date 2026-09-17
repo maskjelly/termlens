@@ -4,7 +4,12 @@
 # Each fixture models one way a link rots, and the gate is asserted to notice:
 #
 #   contributing-good/       what CONTRIBUTING.md legitimately does — relative
-#                            links, an org link, a fragment, an external site
+#                            links resolved from the file's own directory, an
+#                            org link, a fragment, an external site
+#   contributing-root-relative/  the #384 shape — a link that resolves from the
+#                            repository root but not from the file, which the
+#                            gate accepted while it joined relative links to
+#                            the root
 #   contributing-missing/    a relative link to a target that was renamed away
 #   contributing-typo-org/   #351's `…/vyncint/temlens/…`, one letter short
 #   readme-relative/         the packaged README with a relative target, which
@@ -40,7 +45,8 @@ expect() {
   esac
 }
 
-expect "CONTRIBUTING.md: relative links, org link, fragment, external" zero contributing-good/CONTRIBUTING.md
+expect "CONTRIBUTING.md: relative links resolve from the file (#384)" zero contributing-good/CONTRIBUTING.md
+expect "CONTRIBUTING.md: a link good from the root only fails (#384)" nonzero contributing-root-relative/CONTRIBUTING.md
 expect "CONTRIBUTING.md: a deleted in-repo target fails" nonzero contributing-missing/CONTRIBUTING.md
 expect "CONTRIBUTING.md: a misspelled org repository fails (#351)" nonzero contributing-typo-org/CONTRIBUTING.md
 expect "README.md: a relative target fails (crates.io rewrites it)" nonzero readme-relative/README.md
@@ -50,6 +56,6 @@ expect "this repository's own files pass" zero "$root/README.md" "$root/CONTRIBU
 
 rm -f out.log
 if [ "$status" -eq 0 ]; then
-  echo "link gate selftest: 7 expectation(s), the gate fails when it should"
+  echo "link gate selftest: 8 expectation(s), the gate fails when it should"
 fi
 exit "$status"

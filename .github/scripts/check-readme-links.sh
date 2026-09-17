@@ -2,7 +2,7 @@
 # Every link in the markdown we ship, or hand a contributor, must point at
 # something that exists.
 #
-# Two files are read, and the rules differ between them for a reason that is
+# The rule each file gets depends on where it is rendered from, for a reason
 # worth knowing before changing either half:
 #
 # * `README.md` is packaged. `crates/termlens/Cargo.toml` sets
@@ -27,8 +27,10 @@
 #
 # So each file gets the rule that generalises -- an in-repo target names a path
 # that is really here -- and only the packaged one gets the absolute-only rule
-# on top. Relative links are resolved against the repository root, which is
-# where both files live.
+# on top. A relative link is resolved against the linking file's own directory,
+# the way GitHub, crates.io and a browser resolve it. Joining it to the
+# repository root instead is what let three links in `docs/LIMITATIONS.md`
+# point at `docs/docs/…` while this gate called that file green (#384).
 #
 # The other half is a URL naming no in-repo path at all: #351 shipped
 # `…/vyncint/temlens/…` (one letter short) into `CONTRIBUTING.md` and all
@@ -70,6 +72,11 @@ for file in "${files[@]}"; do
     status=1
     continue
   fi
+
+  # A relative link resolves against the file that contains it, the way the
+  # reader's browser resolves it. At the root that is the root, so those files
+  # are unaffected; under docs/ it is the difference #384 was about.
+  dir=$(cd "$(dirname "$file")" && pwd)
 
   # Only files rendered from a URL where a relative link cannot resolve may
   # not use them: README.md is packaged, and the pull-request template is
@@ -128,8 +135,9 @@ for file in "${files[@]}"; do
         else
           path=${link%%#*}
           path=${path%%\?*}
-          if [ ! -e "$root/$path" ]; then
+          if [ ! -e "$dir/$path" ]; then
             echo "$file LINK: \"$link\" is linked but not in the repository" >&2
+            echo "  From this file it resolves to \"$dir/$path\"." >&2
             status=1
           fi
         fi
