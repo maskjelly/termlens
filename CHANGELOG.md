@@ -30,6 +30,17 @@ reads that marker.
 
 ### Fixed
 
+- A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
+  instead of having its body decoded as pixels (#402). The body of those
+  three is a path or a shared-memory name, not image data, so a small
+  declared size returned an `Ok` bitmap holding the ASCII of `/tmp`, and a
+  larger one blamed a short payload. `kitty +kitten icat` uses temp-file
+  and shared-memory transmission by default, so this was the common path
+  for a real image, not a synthetic one. An unknown medium is refused for
+  the same reason. `GraphicsPayload::transmission()` reports which one it
+  was, as a new `GraphicsTransmission`; termlens still never opens the
+  path or the mapping.
+
 - A kitty transmission declaring a width or a height of zero is refused as
   malformed instead of decoding to an empty bitmap (#404). `s=` and `v=`
   are the pixel dimensions of a picture, so a zero contradicts the
@@ -37,6 +48,13 @@ reads that marker.
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
 
+- `Screen::parse` rejects a control character in a grid row instead of
+  folding it into the cell before it: `unicode_width` answers `None` for an
+  `ESC`, a tab or a `DEL` and `Some(0)` for a combining mark, and the parser
+  read both as zero width, so the raw byte survived into every rendering.
+  An `ESC` from a snapshot made `render --svg` write a document `xmllint`
+  refuses to open, and `to_ansi` clear the screen of the reader it was
+  printed to; a combining mark still joins its cell as before (#376).
 
 - `Screen::diff` frames a row of wide characters with `│` at the same
   display column on the text line and on the marker line. The row columns

@@ -122,6 +122,7 @@ pub use error::{Error, Result};
 pub use graphics::{Bitmap, DecodeError};
 pub use graphics::{
     GraphicsAction, GraphicsFormat, GraphicsPayload, GraphicsProtocol, GraphicsSeen,
+    GraphicsTransmission,
 };
 pub use keys::{Chord, Input, Key};
 pub use screen::{
