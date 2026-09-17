@@ -172,6 +172,31 @@ fn strikethrough_and_blink_appear_in_the_styled_rendering() -> termlens::Result<
 }
 
 #[test]
+fn blink_lands_on_the_cell_the_application_set_it_on() -> termlens::Result<()> {
+    // #390: the SGR rewrite emitted nothing when it kept no parameter, so
+    // the ESC that was also terminating this unterminated OSC vanished from
+    // the shadow stream; its parser swallowed `A`, and blink landed one cell
+    // left (a debug assertion caught the divergence).
+    let mut t = emit(&["--raw", r"\e]0;title\e[31mA\e[5mB\e[0mC", "--wait"])?;
+    t.wait_until(|s| s.contains("ABC"))?;
+    let s = t.screen();
+    assert_eq!(s.row_text(0).trim_end(), "ABC");
+
+    let a = *s.cell(0, 0).unwrap().style();
+    assert_eq!(a.fg, termlens::Color::Indexed(1));
+    assert!(!a.blink, "A is coloured, not blinking");
+    assert!(
+        s.cell(0, 1).unwrap().style().blink,
+        "B is the blinking cell"
+    );
+    assert!(!s.cell(0, 2).unwrap().style().blink, "C is past it");
+
+    t.send(Key::Enter)?;
+    assert!(t.wait_exit()?.success());
+    Ok(())
+}
+
+#[test]
 fn colon_form_rgb_colours_match_semicolon_form() -> termlens::Result<()> {
     let mut t = emit(&[
         "--raw",

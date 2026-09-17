@@ -252,8 +252,9 @@ fn normalize_colon_colours(seq: &[u8]) -> Option<Vec<u8>> {
 /// `None` means "not a plain SGR — emit it verbatim": a private prefix
 /// (`?`, `<`, `=`, `>`) or an intermediate byte makes it something else, and
 /// guessing there is how a rewriter loses bytes that shape the grid.
-/// `Some(bytes)` is what to emit, and may be empty when every parameter was
-/// dropped.
+/// `Some(bytes)` is what to emit, always a complete sequence: when every
+/// parameter was dropped the surrogate `ESC[39m` stands in so the sequence's
+/// ESC survives (#390).
 fn rewrite_sgr(seq: &[u8]) -> Option<Vec<u8>> {
     // `ESC [ … m`
     let params = seq.get(2..seq.len().checked_sub(1)?)?;
@@ -306,16 +307,25 @@ fn rewrite_sgr(seq: &[u8]) -> Option<Vec<u8>> {
     }
 
     let mut bytes = Vec::new();
-    if !out.is_empty() {
-        bytes.extend_from_slice(b"\x1b[");
-        for (n, param) in out.iter().enumerate() {
-            if n > 0 {
-                bytes.push(b';');
-            }
-            bytes.extend_from_slice(param.to_string().as_bytes());
-        }
-        bytes.push(b'm');
+    if out.is_empty() {
+        // #390: the ESC introducing this SGR may also be doing structural
+        // work in the primary stream — terminating an unterminated OSC,
+        // aborting a half-written CSI — so it must not disappear, or the
+        // shadow's parser swallows the next printable byte as a final one.
+        // `39` resets only the foreground colour, which no shadow cell is
+        // ever read for; `0` would clear a bold/italic/underline carrier
+        // mid-run and with it a blink, conceal or strikethrough.
+        bytes.extend_from_slice(b"\x1b[39m");
+        return Some(bytes);
     }
+    bytes.extend_from_slice(b"\x1b[");
+    for (n, param) in out.iter().enumerate() {
+        if n > 0 {
+            bytes.push(b';');
+        }
+        bytes.extend_from_slice(param.to_string().as_bytes());
+    }
+    bytes.push(b'm');
     Some(bytes)
 }
 
@@ -397,13 +407,18 @@ mod tests {
 
     #[test]
     fn the_primarys_own_attributes_are_dropped_from_the_shadow() {
-        // Otherwise a real bold would read as a blink.
-        assert_eq!(shadowed(b"\x1b[1mX"), "X");
-        assert_eq!(shadowed(b"\x1b[3mX"), "X");
-        assert_eq!(shadowed(b"\x1b[4mX"), "X");
-        assert_eq!(shadowed(b"\x1b[7;31;44mX"), "X");
+        // Otherwise a real bold would read as a blink. A sequence left with
+        // nothing keeps only the surrogate `39` (#390): the parameter is
+        // still dropped, the ESC survives.
+        assert_eq!(shadowed(b"\x1b[1mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[3mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[4mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[7;31;44mX"), "E[39mX");
         // …including the resets, which would clear a carrier.
-        assert_eq!(shadowed(b"\x1b[22m\x1b[23m\x1b[24m\x1b[27m"), "");
+        assert_eq!(
+            shadowed(b"\x1b[22m\x1b[23m\x1b[24m\x1b[27m"),
+            "E[39mE[39mE[39mE[39m"
+        );
         // Reset-all means the same in both streams.
         assert_eq!(shadowed(b"\x1b[0mX"), "E[0mX");
         assert_eq!(shadowed(b"\x1b[mX"), "E[0mX");
@@ -415,20 +430,65 @@ mod tests {
         assert_eq!(shadowed(b"\x1b[0;9;1;8mX"), "E[0;4;3mX");
     }
 
+    /// #390: a sequence left with no shadow parameter must still emit one.
+    ///
+    /// The rewrite is not only about the attributes: the ESC introducing it
+    /// may also be terminating an unterminated OSC or aborting a half-written
+    /// CSI in the primary stream, and emitting zero bytes would strip that ESC
+    /// from the shadow stream too. The shadow's parser would then consume the
+    /// next printable byte as a final byte, and the two grids diverge.
+    #[test]
+    fn a_fully_dropped_sgr_still_emits_a_complete_sequence() {
+        for seq in [
+            &b"\x1b[31m"[..],
+            &b"\x1b[7m"[..],
+            &b"\x1b[38;5;1m"[..],
+            &b"\x1b[1;2m"[..],
+        ] {
+            let rewritten = rewrite_sgr(seq).expect("a complete plain SGR");
+            assert!(
+                rewritten.starts_with(b"\x1b[") && rewritten.ends_with(b"m"),
+                "{seq:?} rewrote to {rewritten:?}, which is not a complete sequence"
+            );
+        }
+        assert_eq!(shadowed(b"\x1b[31mX"), "E[39mX", "the surrogate is emitted");
+    }
+
+    /// The module's own invariant, on the two payloads from the issue: the
+    /// shadow parser and a primary parser fed the same stream must agree.
+    #[test]
+    fn a_dropped_sgr_keeps_a_structural_esc_in_step() {
+        for payload in [
+            &b"\x1b]0;title\x1b[31mA\x1b[5mB\x1b[0mC"[..],
+            &b"\x1b[1;2\x1b[31mA"[..],
+        ] {
+            let mut primary = ::vt100::Parser::new(4, 20, 0);
+            let mut shadow = AttrShadow::new(4, 20, 0);
+            primary.process(payload);
+            shadow.feed(payload);
+            assert_eq!(
+                primary.screen().contents(),
+                shadow.contents(),
+                "payload {payload:?}"
+            );
+        }
+    }
+
     #[test]
     fn an_extended_colour_never_looks_like_a_carrier() {
         // The trap: the `5` in `38;5;196` selects palette mode, not blink.
         // Reading it as blink would paint a whole run with an attribute the
-        // application never set.
-        assert_eq!(shadowed(b"\x1b[38;5;196mX"), "X");
-        assert_eq!(shadowed(b"\x1b[48;5;9mX"), "X");
-        assert_eq!(shadowed(b"\x1b[38;2;255;0;8mX"), "X"); // the 8 is blue, not conceal
+        // application never set. A colour-only sequence keeps no carrier, so
+        // it leaves only the `39` surrogate (#390).
+        assert_eq!(shadowed(b"\x1b[38;5;196mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[48;5;9mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[38;2;255;0;8mX"), "E[39mX"); // the 8 is blue, not conceal
         assert_eq!(shadowed(b"\x1b[38;2;0;9;0;5mX"), "E[1mX"); // …trailing 5 IS blink
                                                                // Colon form is one self-contained parameter group.
-        assert_eq!(shadowed(b"\x1b[38:5:196mX"), "X");
-        assert_eq!(shadowed(b"\x1b[38:2::255:0:9mX"), "X");
-        assert_eq!(shadowed(b"\x1b[4:3mX"), "X"); // curly underline, not strike
-                                                  // A carrier still survives alongside one.
+        assert_eq!(shadowed(b"\x1b[38:5:196mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[38:2::255:0:9mX"), "E[39mX");
+        assert_eq!(shadowed(b"\x1b[4:3mX"), "E[39mX"); // curly underline, not strike
+                                                       // A carrier still survives alongside one.
         assert_eq!(shadowed(b"\x1b[38;5;196;9mX"), "E[4mX");
     }
 

@@ -46,6 +46,13 @@ reads that marker.
   and `termlens render` read back (#340); and `--version` prints the CLI's
   one `termlens <version>` line, instead of `inspect (termlens …)`. It
   also takes `--cwd PATH` like the command it mirrors (#312). (#372)
+- An SGR the attribute shadow keeps nothing from — `ESC[31m`, `ESC[7m`,
+  `ESC[38;5;1m` — is rewritten to `ESC[39m` instead of the empty string.
+  The ESC introducing the sequence also terminates an unterminated OSC or
+  aborts a half-written CSI in the primary stream, and deleting it from the
+  shadow's stream let that parser swallow the next printable character: a
+  debug build panicked on the divergence, and a release build read blink,
+  conceal or strikethrough from the wrong cell (#390).
 
 - A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
   instead of having its body decoded as pixels (#402). The body of those

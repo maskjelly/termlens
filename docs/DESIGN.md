@@ -911,7 +911,13 @@ selects palette mode rather than blink, so extended-colour parameters are
 stepped over in both the semicolon and colon forms; anything that is not a
 plain SGR (private prefix, intermediate byte, aborted sequence) passes
 through byte-for-byte, which is what makes "cannot diverge" true rather
-than merely likely.
+than merely likely. A sequence left with no parameter is rewritten to
+`ESC[39m` rather than deleted (#390): the ESC introducing it may also be
+terminating an unterminated OSC or aborting a half-written CSI, and
+dropping it would remove that ESC from the shadow stream, leaving its
+parser to swallow the next printable byte. `39` resets only the foreground
+colour, and foreground is not one of the three attributes read from the
+shadow.
 
 When upstream gains the attributes, `emu/shadow.rs` deletes and
 `convert_cell` reads the three flags directly.
