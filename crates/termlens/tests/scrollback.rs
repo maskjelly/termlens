@@ -21,6 +21,18 @@ fn numbered(rows: u16, count: usize, scrollback: usize) -> termlens::Result<Term
     )
 }
 
+/// The `emit` fixture on a screen small enough that six lines commit three
+/// rows to history, with room for more.
+fn reset_emit(steps: &[&str]) -> termlens::Result<Terminal> {
+    common::spawn_emit(
+        Terminal::builder()
+            .size(20, 4)
+            .scrollback(20)
+            .timeout(Duration::from_secs(10)),
+        steps,
+    )
+}
+
 #[test]
 fn content_scrolled_off_the_top_is_still_assertable() -> termlens::Result<()> {
     let mut t = numbered(6, 40, 1000)?;
@@ -182,5 +194,77 @@ fn a_wait_with_nothing_scrolled_carries_no_history_note() -> termlens::Result<()
     assert!(!err.to_string().contains("scrolled off"), "{err}");
     t.send(Key::Enter)?;
     assert!(t.wait_exit()?.success());
+    Ok(())
+}
+
+/// `ESC c` (RIS) rebuilds the backend's screen and empties its history, but
+/// the rows termlens already committed must survive it and the rows that
+/// scroll afterwards must still be committed. The high-water mark used to be
+/// cleared only when the reset arrived in a read of its own, so which rows
+/// went missing depended on how the PTY chunked the writes (#391). Each
+/// chunking is pinned: the reset in a write of its own, the reset merged
+/// with the rows that follow it, and the whole stream in one write. The
+/// sleeps keep those writes apart for the reader; the assertion holds
+/// whether or not the PTY happens to coalesce them anyway.
+#[test]
+fn a_hard_reset_neither_drops_the_history_before_it_nor_the_rows_after_it() -> termlens::Result<()>
+{
+    // Three lines scroll off before the reset and three more after, on a
+    // 4-row screen; the order they were written in is the assertion.
+    let expected = "1|\n2|\n3|\nA|\nB|\nC|";
+
+    let shapes: [(&str, &[&str]); 3] = [
+        (
+            "reset in a write of its own",
+            &[
+                "1|\n2|\n3|\n4|\n5|\n6|\n",
+                "--sleep",
+                "100ms",
+                "--raw",
+                "\\ec",
+                "--sleep",
+                "100ms",
+                "A|\nB|\nC|\nD|\nE|\nF|\n",
+                "DONE",
+                "--wait",
+            ],
+        ),
+        (
+            "reset merged with the rows after it",
+            &[
+                "1|\n2|\n3|\n4|\n5|\n6|\n",
+                "--sleep",
+                "100ms",
+                "--raw",
+                "\\ecA|\nB|\nC|\nD|\nE|\nF|\n",
+                "DONE",
+                "--wait",
+            ],
+        ),
+        (
+            "the whole stream in one write",
+            &[
+                "--raw",
+                "1|\n2|\n3|\n4|\n5|\n6|\n\\ecA|\nB|\nC|\nD|\nE|\nF|\nDONE",
+                "--wait",
+            ],
+        ),
+    ];
+
+    for (name, steps) in shapes {
+        let mut t = reset_emit(steps)?;
+        t.wait_until(|s| s.contains("DONE"))?;
+
+        let s = t.screen();
+        assert_eq!(s.scrollback_text(), expected, "{name}");
+        assert!(
+            s.full_text().starts_with(expected),
+            "{name}: history and grid out of order:\n{}",
+            s.full_text()
+        );
+
+        t.send(Key::Enter)?;
+        assert!(t.wait_exit()?.success(), "{name}");
+    }
     Ok(())
 }

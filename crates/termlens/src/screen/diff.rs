@@ -8,6 +8,8 @@
 
 use std::fmt;
 
+use unicode_width::UnicodeWidthStr;
+
 use super::{same_cursor, Cell, Screen, Style};
 
 /// The difference between two screens. Built by [`Screen::diff`]; render it
@@ -221,6 +223,18 @@ fn cursor_text((row, col, visible): (u16, u16, bool)) -> String {
     }
 }
 
+/// `text` followed by blanks out to `width` display columns, so the `│`
+/// closing the row line lands in the same column as the one closing its
+/// marker line. The `{:<width$}` formatter counts `char`s, and a row's text
+/// is exactly where the two counts part ways (#380).
+fn pad(text: &str, width: usize) -> String {
+    let missing = width.saturating_sub(text.width());
+    let mut out = String::with_capacity(text.len() + missing);
+    out.push_str(text);
+    out.extend(std::iter::repeat_n(' ', missing));
+    out
+}
+
 impl fmt::Display for ScreenDiff {
     /// Header with the size and cursor deltas; then, for each changed row,
     /// the row before and after side by side over a marker line with `^`
@@ -252,7 +266,7 @@ impl fmt::Display for ScreenDiff {
         }
         let width = usize::from(self.before_size.0.min(self.after_size.0));
         for (row, before, after, changed) in &self.rows {
-            writeln!(f, "{row:>3} │{before:<width$}│{after}")?;
+            writeln!(f, "{row:>3} │{}│{after}", pad(before, width))?;
             let mut marks = vec![' '; width];
             for &col in changed {
                 if let Some(mark) = marks.get_mut(usize::from(col)) {
@@ -261,7 +275,7 @@ impl fmt::Display for ScreenDiff {
             }
             let marks: String = marks.into_iter().collect();
             let marks = marks.trim_end();
-            writeln!(f, "    │{marks:<width$}│{marks}")?;
+            writeln!(f, "    │{}│{marks}", pad(marks, width))?;
         }
         if self.unchanged_rows > 0 {
             writeln!(f, "… {} rows unchanged", self.unchanged_rows)?;
@@ -270,5 +284,75 @@ impl fmt::Display for ScreenDiff {
             writeln!(f, "styles: {row}: {before} → {after}")?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::screen::TermState;
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+    /// An 8-column row built the way the emulator builds one: a wide
+    /// character takes a continuation cell, the rest is blank.
+    fn row(text: &str) -> Screen {
+        let mut cells = Vec::new();
+        for ch in text.chars() {
+            let wide = ch.width().unwrap_or(1) == 2;
+            cells.push(Cell::new(ch.to_string(), Style::default(), wide, false));
+            if wide {
+                cells.push(Cell::new(String::new(), Style::default(), false, true));
+            }
+        }
+        cells.resize(8, Cell::new(String::new(), Style::default(), false, false));
+        Screen::from_parts(8, 1, 0, 0, true, cells, TermState::default())
+    }
+
+    /// The display column of every `│` in a rendered line.
+    fn separator_columns(line: &str) -> Vec<usize> {
+        let mut columns = Vec::new();
+        let mut column = 0;
+        for ch in line.chars() {
+            if ch == '│' {
+                columns.push(column);
+            }
+            column += ch.width().unwrap_or(0);
+        }
+        columns
+    }
+
+    /// #380: the row line and the marker line are padded to the same number
+    /// of display columns, so the `│` frame sits in one place even when the
+    /// row holds wide characters — `{:<width$}` counts `char`s, not columns.
+    #[test]
+    fn wide_rows_keep_the_frame_lines_aligned() {
+        for (before, after, expected) in [
+            (
+                "東京ab",
+                "東京aZ",
+                "size: 8x1   cursor: 0,0\n  0 │東京ab  │東京aZ\n    │     ^  │     ^\n",
+            ),
+            (
+                "😀ab",
+                "😀aZ",
+                "size: 8x1   cursor: 0,0\n  0 │😀ab    │😀aZ\n    │   ^    │   ^\n",
+            ),
+        ] {
+            let rendered = row(before).diff(&row(after)).to_string();
+            assert_eq!(rendered, expected, "the frame for {before:?}");
+            let mut lines = rendered.lines().skip(1);
+            let text = lines.next().expect("a row line");
+            let marks = lines.next().expect("its marker line");
+            assert_eq!(
+                separator_columns(text),
+                separator_columns(marks),
+                "the │ separators sit at different display columns:\n{rendered}"
+            );
+            assert_eq!(
+                UnicodeWidthStr::width(text),
+                UnicodeWidthStr::width(marks),
+                "the frame lines disagree in display width:\n{rendered}"
+            );
+        }
     }
 }

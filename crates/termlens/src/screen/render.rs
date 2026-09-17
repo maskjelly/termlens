@@ -172,7 +172,14 @@ impl Screen {
     /// `<text>` per foreground run, fixed cell metrics (9×18 px), a
     /// monospace fallback font stack and no font embedding — enough for a
     /// bug report or a README, not a typeset transcript. Concealed text is
-    /// drawn as blanks, as a terminal shows it; dim is opacity.
+    /// drawn as blanks, as a terminal shows it; dim is opacity, and blink is
+    /// an `<animate>` on the glyph's own opacity — the background `<rect>`
+    /// is a sibling, so it keeps painting, as it does in a terminal.
+    ///
+    /// Unlike the HTML rendering, the SVG one cannot honour
+    /// `prefers-reduced-motion`: SMIL is not reachable from CSS, and an
+    /// `<animate>` has no media-query form. A reader who needs the motion
+    /// stopped should take the HTML rendering, which does honour it.
     ///
     /// The root carries `role="img"` and a `<title>` naming the picture —
     /// `termlens screen, 80x24`, and the application's own
@@ -254,6 +261,19 @@ impl Screen {
                 }
                 out.push('>');
                 escape_xml(shown, &mut out);
+                if style.blink {
+                    // A hard toggle, not a fade, and the glyph alone: the
+                    // background `<rect>` above is a sibling. An SMIL
+                    // animation outranks the attribute it animates, so a
+                    // dim blink carries dim's 0.6 in its values or it would
+                    // animate back to full opacity.
+                    let opacity = if style.dim { "0.6" } else { "1" };
+                    let _ = write!(
+                        out,
+                        "<animate attributeName=\"opacity\" values=\"{opacity};0\" \
+                         calcMode=\"discrete\" dur=\"1s\" repeatCount=\"indefinite\"/>"
+                    );
+                }
                 out.push_str("</text>\n");
             }
         }
@@ -264,13 +284,28 @@ impl Screen {
     /// The screen as HTML: a `<pre>` with one `<span style>` per run, so it
     /// pastes into a GitHub step summary or a pull-request comment. The
     /// same run model as [`to_svg`](Self::to_svg); concealed text is shown
-    /// as blanks.
+    /// as blanks, and blink is a `termlens-blink` animation on the run's
+    /// colour — not its opacity — so a dim blinking run keeps its dim and
+    /// the run's background keeps painting, as it does in a terminal. The
+    /// `@keyframes` live in a `<style>` element inside the `<pre>` (a
+    /// `style` attribute cannot hold one) and travel only when a run
+    /// blinks, so a screen without one renders as it always has. A
+    /// `prefers-reduced-motion` rule beside them stops the animation for
+    /// a reader who asked for that; the selector matches the inline style,
+    /// since that is where the `animation` lands.
     #[must_use]
     pub fn to_html(&self) -> String {
         let mut out = format!(
             "<pre style=\"background:{DEFAULT_BG};color:{DEFAULT_FG};font-family:monospace;\
              line-height:1.2;padding:8px\">"
         );
+        if (0..self.rows()).any(|row| runs(self, row).iter().any(|(_, _, style, _)| style.blink)) {
+            out.push_str(
+                "<style>@keyframes termlens-blink{50%{color:transparent}}\
+                 @media(prefers-reduced-motion:reduce){\
+                 [style*=termlens-blink]{animation:none}}</style>",
+            );
+        }
         for row in 0..self.rows() {
             for (_, cols, style, text) in runs(self, row) {
                 let shown: String = if style.conceal {
@@ -292,6 +327,9 @@ impl Screen {
                 }
                 if style.dim {
                     css.push_str(";opacity:0.6");
+                }
+                if style.blink {
+                    css.push_str(";animation:termlens-blink 1s step-end infinite");
                 }
                 let mut decoration = Vec::new();
                 if style.underline {
