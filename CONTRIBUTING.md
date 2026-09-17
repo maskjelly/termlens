@@ -29,10 +29,10 @@ cd termlens
 cargo test --workspace --all-features   # the whole suite: unit + integration + doctests, `decode` included
 ```
 
-`--all-features` matters: `decode` is off by default, and without it sixteen
-tests never build. That is the `test` job. CI gates on more than the test
-job, and every gate is reproducible locally — run these before pushing and
-nothing in CI should surprise you:
+`--all-features` matters: `decode` is off by default, and without it the
+`decode` tests never build. That is the `test` job. CI gates on more than
+the test job, and every gate is reproducible locally — run these before
+pushing and nothing in CI should surprise you:
 
 ```sh
 cargo fmt --all --check
@@ -48,11 +48,12 @@ cargo test -p termlens --no-default-features --features serde
 cargo test --workspace                                   # default features
 cargo build -p termlens-cli                              # then the CLI's documented exit codes:
 .github/scripts/check-cli-contract.sh target/debug/termlens
-.github/scripts/check-readme-links.sh README.md CONTRIBUTING.md   # every in-repo link target exists; README.md alone may not use relative ones
+.github/scripts/check-readme-links.sh README.md CONTRIBUTING.md .github/PULL_REQUEST_TEMPLATE.md   # every in-repo link target exists; the packaged README and the pull-request template may not use relative ones
 .github/scripts/check-emit-steps.sh                      # the emit fixture documents exactly the steps it implements
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps
 RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features
 .github/scripts/check-candidate-statement.sh              # README, CHANGELOG and STABILITY state the candidate in the same words
+.github/scripts/check-report-pin.sh                       # the three report@v refs agree with the workspace version
 cargo deny check                          # cargo install cargo-deny
 pipx run zizmor==1.29.0 --persona=pedantic .github/workflows/   # workflow audit; needs GH_TOKEN for the online checks
 cargo +1.85 check --workspace --exclude ratatui-app --locked --all-targets    # the MSRV: `rust-version` in Cargo.toml (the ratatui fixture needs 1.88)
@@ -61,6 +62,7 @@ cargo +1.85 check -p termlens --no-default-features --all-targets --locked
 cargo clippy --workspace --all-targets --all-features --target x86_64-pc-windows-msvc -- -D warnings   # the Windows build, from any host: `rustup target add x86_64-pc-windows-msvc` once
 tools/semver-gate-selftest/run.sh                       # the semver gate can fail (cargo install cargo-semver-checks)…
 tools/link-gate-selftest/run.sh                         # …and so can the link gate, with no extra tooling
+tools/report-pin-gate-selftest/run.sh                   # …and the report-pin gate, likewise
 .github/scripts/check-semver.sh 0.11.1                  # …and the public API is compatible with the last published release
 ```
 

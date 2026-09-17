@@ -404,6 +404,8 @@ Read the first line for the cause:
 | `… note: N rows have scrolled off the top` | the text went into history | assert with `full_text()` / `scrollback_text()` |
 | `… note: the application queried the terminal (^[[?u …) and received no answer` | the app is blocked on a probe termlens deliberately does not answer | the app needs a fallback; see the termlens README's Known limitations |
 | `terminal closed (EOF) while waiting for …` | the app exited before the predicate held | check `wait_exit()` first, or the app crashed — the final screen shows why |
+| ``failed to send Char('x') to `…` (the child is gone (exit code 7) and the terminal is closed)`` | input was sent after the child exited | check `wait_exit()` first and inspect the screen embedded under `--- screen at the failed write ---` |
+| ``failed to send … to `…` (the application is not reading its input, and the PTY buffer is full — no progress in 5s)`` | the child is alive but has stopped draining terminal input | wait for the application to draw the state that is ready for input before typing |
 | `the application never emitted a DEC 2026 synchronized update` | `wait_frame` or `record().stop()` against an app without synchronized output | use `snapshot_after` / `wait_until` (rule 8) |
 | `--- last returned frame → live screen ---` under a `wait_frame` timeout | the app repainted, but never into the predicate | the diff shows what did change; the predicate is looking at the wrong thing |
 | `input not receivable: the application has not enabled mouse tracking` | `click`/`drag`/`scroll` before the app enabled the mouse | `wait_until(|s| s.mouse_mode() != MouseMode::None)` first |

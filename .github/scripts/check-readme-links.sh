@@ -18,6 +18,12 @@
 #   (`AGENTS.md`, `docs/RELEASING.md`, `.github/workflows/ci.yml`), so for it
 #   the relative form is fine. The target still has to exist, and until #352
 #   no file checked that.
+# * `.github/PULL_REQUEST_TEMPLATE.md` is not packaged either, but GitHub
+#   renders it in the body of every pull request, where a relative target
+#   resolves against the pull request's URL rather than the repository root:
+#   `../CONTRIBUTING.md` from `/vyncint/termlens/pull/351` is a 404 in every
+#   pull request that uses the template (#369). So it gets the absolute-only
+#   rule too, for a different URL than the README's.
 #
 # So each file gets the rule that generalises -- an in-repo target names a path
 # that is really here -- and only the packaged one gets the absolute-only rule
@@ -65,11 +71,13 @@ for file in "${files[@]}"; do
     continue
   fi
 
-  # Only the packaged README may not use relative links.
+  # Only files rendered from a URL where a relative link cannot resolve may
+  # not use them: README.md is packaged, and the pull-request template is
+  # read in a pull request body (see the header).
   absolute_only=no
-  if [ "${file##*/}" = "README.md" ]; then
-    absolute_only=yes
-  fi
+  case "${file##*/}" in
+    README.md | PULL_REQUEST_TEMPLATE.md) absolute_only=yes ;;
+  esac
 
   checked=0
   while IFS= read -r link; do
@@ -108,8 +116,14 @@ for file in "${files[@]}"; do
         ;;
       *)
         if [ "$absolute_only" = yes ]; then
-          echo "README LINK: relative target \"$link\" — crates.io rewrites it against" >&2
-          echo "  crates/termlens/, where it does not exist. Use ${base}${link}" >&2
+          case "${file##*/}" in
+            PULL_REQUEST_TEMPLATE.md)
+              echo "$file LINK: relative target \"$link\" — GitHub resolves it" >&2
+              echo "  against the pull request's URL, where it does not exist. Use ${base}${link#../}" >&2 ;;
+            *)
+              echo "README LINK: relative target \"$link\" — crates.io rewrites it against" >&2
+              echo "  crates/termlens/, where it does not exist. Use ${base}${link}" >&2 ;;
+          esac
           status=1
         else
           path=${link%%#*}
