@@ -24,8 +24,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -43,8 +43,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -62,8 +62,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -81,8 +81,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -100,8 +100,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -117,8 +117,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -134,8 +134,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -151,8 +151,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": true,
           "blink": false,
+          "reverse": true,
           "conceal": false,
           "strikethrough": false
         },
@@ -168,8 +168,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": true,
           "blink": false,
+          "reverse": true,
           "conceal": false,
           "strikethrough": false
         },
@@ -185,8 +185,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": true,
           "blink": false,
+          "reverse": true,
           "conceal": false,
           "strikethrough": false
         },
@@ -202,8 +202,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": true,
           "blink": false,
+          "reverse": true,
           "conceal": false,
           "strikethrough": false
         },
@@ -219,8 +219,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": true,
           "blink": false,
+          "reverse": true,
           "conceal": false,
           "strikethrough": false
         },
@@ -236,8 +236,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": true,
           "blink": false,
+          "reverse": true,
           "conceal": false,
           "strikethrough": false
         },
@@ -253,8 +253,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
+          "blink": false,
           "reverse": true,
-          "blink": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -270,8 +270,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -287,8 +287,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -304,8 +304,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -321,8 +321,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -338,8 +338,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -355,8 +355,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -372,8 +372,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -389,8 +389,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -406,8 +406,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -423,8 +423,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -440,8 +440,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -457,8 +457,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -474,8 +474,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -491,8 +491,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -508,8 +508,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -525,8 +525,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -544,8 +544,8 @@ expression: s
           "dim": true,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -561,8 +561,8 @@ expression: s
           "dim": true,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -578,8 +578,8 @@ expression: s
           "dim": true,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -595,8 +595,8 @@ expression: s
           "dim": true,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -612,8 +612,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -629,8 +629,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -646,8 +646,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -663,8 +663,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -680,8 +680,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -697,8 +697,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": true,
           "strikethrough": false
         },
@@ -714,8 +714,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": true,
           "strikethrough": false
         },
@@ -731,8 +731,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": true,
           "strikethrough": false
         },
@@ -748,8 +748,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": true,
           "strikethrough": false
         },
@@ -765,8 +765,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": true,
           "strikethrough": false
         },
@@ -782,8 +782,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": true,
           "strikethrough": false
         },
@@ -799,8 +799,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -822,8 +822,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -845,8 +845,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -862,8 +862,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -879,8 +879,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -896,8 +896,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -913,8 +913,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -930,8 +930,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -947,8 +947,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -964,8 +964,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -981,8 +981,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -998,8 +998,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1015,8 +1015,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1032,8 +1032,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1049,8 +1049,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1068,8 +1068,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1085,8 +1085,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1102,8 +1102,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1119,8 +1119,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1136,8 +1136,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1153,8 +1153,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1170,8 +1170,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1187,8 +1187,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1204,8 +1204,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1221,8 +1221,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1238,8 +1238,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1255,8 +1255,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1272,8 +1272,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1289,8 +1289,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1306,8 +1306,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1323,8 +1323,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1340,8 +1340,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1357,8 +1357,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1374,8 +1374,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1391,8 +1391,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1408,8 +1408,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1425,8 +1425,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1442,8 +1442,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1459,8 +1459,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1476,8 +1476,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1493,8 +1493,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1510,8 +1510,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1527,8 +1527,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1544,8 +1544,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1561,8 +1561,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1580,8 +1580,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1597,8 +1597,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1614,8 +1614,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1631,8 +1631,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1648,8 +1648,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1665,8 +1665,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1682,8 +1682,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1699,8 +1699,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1716,8 +1716,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1733,8 +1733,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1750,8 +1750,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1767,8 +1767,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1784,8 +1784,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1801,8 +1801,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1818,8 +1818,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1835,8 +1835,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1852,8 +1852,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1869,8 +1869,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1886,8 +1886,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1903,8 +1903,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1920,8 +1920,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1937,8 +1937,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1954,8 +1954,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1971,8 +1971,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -1988,8 +1988,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -2005,8 +2005,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -2022,8 +2022,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -2039,8 +2039,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -2056,8 +2056,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },
@@ -2073,8 +2073,8 @@ expression: s
           "dim": false,
           "italic": false,
           "underline": false,
-          "reverse": false,
           "blink": false,
+          "reverse": false,
           "conceal": false,
           "strikethrough": false
         },

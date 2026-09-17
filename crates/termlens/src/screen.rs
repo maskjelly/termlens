@@ -80,6 +80,9 @@ pub struct Style {
     pub fg: Color,
     /// Background color.
     pub bg: Color,
+    // Serde emits fields in declaration order, so this is the JSON key
+    // order, and `docs/DESIGN.md` §3 fixes it to SGR order — `blink`
+    // before `reverse` is the pair that drifted (#381).
     /// Bold / increased intensity (`SGR 1`).
     ///
     /// `bold` and `dim` are two fields over **one** intensity state: the
@@ -94,10 +97,10 @@ pub struct Style {
     pub italic: bool,
     /// Underline.
     pub underline: bool,
-    /// Reverse video (foreground and background swapped).
-    pub reverse: bool,
     /// Blinking (`SGR 5`/`6`; the two rates are not distinguished).
     pub blink: bool,
+    /// Reverse video (foreground and background swapped).
+    pub reverse: bool,
     /// Concealed: the cell holds text the terminal does not display
     /// (`SGR 8`) — a masked password field, typically.
     ///

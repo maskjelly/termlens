@@ -381,6 +381,42 @@ mod json {
             "the last column and row are real"
         );
     }
+
+    /// DESIGN §3 fixes the eight style booleans to SGR order (#381), and
+    /// serde emits a struct's fields in declaration order — so the two
+    /// agree only as long as `Style` declares them that way. Blink is
+    /// SGR 5, reverse SGR 7; they were one declaration apart the wrong way,
+    /// and this reads the key order out of the emitted string rather than
+    /// a `Value`, which no longer remembers it.
+    #[test]
+    fn the_style_booleans_serialise_in_sgr_order() {
+        let screen = Screen::parse(
+            "size: 2x1  cursor: hidden\nab\n\nstyles:\n\
+             0: 0-1 bold dim italic underline blink reverse conceal strikethrough",
+        )
+        .expect("all eight attributes parse");
+        let json = serde_json::to_string(&screen).expect("serializes");
+        let at = json.find("\"style\":").expect("a cell carries a style");
+        let style = &json[at..][..json[at..].find('}').expect("the style object ends")];
+        let mut last = 0;
+        for key in [
+            "bold",
+            "dim",
+            "italic",
+            "underline",
+            "blink",
+            "reverse",
+            "conceal",
+            "strikethrough",
+        ] {
+            let needle = format!("\"{key}\":");
+            let at = style
+                .find(&needle)
+                .unwrap_or_else(|| panic!("{key} is not in {style}"));
+            assert!(at > last, "{key} is out of SGR order in {style}");
+            last = at;
+        }
+    }
 }
 
 /// A grid can hold the words a styles block is made of. Reading them as

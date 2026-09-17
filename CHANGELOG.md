@@ -155,6 +155,14 @@ reads that marker.
   kind you attach a recording of, so it was the one recording that
   rendered wrong.
 
+- The JSON `style` object writes its eight attribute booleans in SGR order,
+  as DESIGN §3 specifies. `Style` declared `reverse` before `blink` — serde
+  follows declaration order — so the emitted document put reverse (SGR 7)
+  before blink (SGR 5) where the spec, the text format's `styles:` block
+  and the ANSI rendering all put blink first. Serde reads by key, so every
+  existing document still deserialises; only the emitted key order and the
+  `Debug` order moved, and a test pins the order now (#381).
+
 ## [0.11.1] - 2026-09-16
 
 ### Added
