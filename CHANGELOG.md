@@ -59,7 +59,8 @@ reads that marker.
 - A `Recorder` dropped without `stop()` stops collecting frames (#396). An
   early return, a `?` or a panic between `record()` and `stop()` left the
   reader thread cloning a whole grid into the recorder on every repaint,
-  filling its 2M-cell budget — about 200 MB once measured — for the life of
+  filling its 2M-cell budget — about 200 MB once measured — for the
+  life of
   the terminal, while the test that paid for it was whichever one ran
   longest afterwards. Dropping a recorder now deregisters it exactly as
   `stop` does.
