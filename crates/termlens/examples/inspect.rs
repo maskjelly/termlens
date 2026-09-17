@@ -18,24 +18,27 @@
 //! window has the same shape: an application that paints in bursts wider
 //! than 300ms is snapshotted mid-render unless it is widened.
 //!
-//! Exit code 0 means inspect ran and printed a screen; the trailer under
-//! the screen says what the program did — its exit status, or that it was
-//! still running at the deadline. Exit code 1 means inspect itself could
-//! not run: bad arguments, or a program that could not be spawned. A
-//! viewer, not a gate: the program's own status is reported, not
-//! propagated.
+//! The screen alone goes to stdout and the trailer to stderr, so
+//! `inspect … > file` writes a saved screen. Exit code 0 means inspect ran
+//! and printed a screen; the trailer says what the program did — its exit
+//! status, or that it was still running at the deadline. Exit code 2 means
+//! inspect itself could not run: bad arguments, or a program that could
+//! not be spawned. A viewer, not a gate: the program's own status is
+//! reported, not propagated.
 
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::ExitCode;
 use std::time::Duration;
 
 use termlens::Terminal;
 
 /// The one copy of the usage text: `--help` prints it to stdout and exits
-/// 0, a missing program prints it to stderr and exits 1 (#229).
+/// 0, a missing program prints it to stderr and exits 2 (#229).
 const USAGE: &str = "\
 usage: inspect [--size COLSxROWS] [--timeout SECONDS] [--idle MILLIS]
-               [--inherit-env] [--ansi] [--env KEY=VALUE]... <program> [args…]
+               [--cwd PATH] [--inherit-env] [--ansi]
+               [--env KEY=VALUE]... <program> [args…]
 
 Runs <program> in an 80x24 pseudo-terminal (or --size), waits for it to
 exit or for the deadline (--timeout, default 5 seconds), and prints the
@@ -43,13 +46,16 @@ rendered screen. A program still running at the deadline is snapshotted
 after --idle milliseconds (default 300) of output silence, then killed.
 The child environment is cleared by default except for PATH; --inherit-env
 keeps the caller's environment, and repeatable --env sets selected values.
+--cwd runs the program in PATH, which must be an existing directory.
 
-Exit code 0: a screen was printed; the trailer under it says what the
-program did. Exit code 1: inspect itself could not run — bad arguments,
-or a program that could not be spawned.
+The screen goes to stdout and nothing else does, so `inspect … > file`
+saves a screen; the trailer that says what the program did — its exit
+status, or that it was still running at the deadline — goes to stderr.
+Exit code 0: a screen was printed. Exit code 2: inspect itself could not
+run — bad arguments, or a program that could not be spawned.
 
   -h, --help     print this text
-      --version  print the termlens version this example was built from
+      --version  print the version
   --             end of options; the program name follows";
 
 /// The value after `flag`, or the one-line diagnostic every flag shares:
@@ -80,6 +86,13 @@ fn render(screen: &termlens::Screen, ansi: bool) -> String {
     }
 }
 
+/// One diagnostic shape for every failure of the tool itself, and the exit
+/// code 2 the CLI promises for the same failures.
+fn fail(message: &str) -> ExitCode {
+    eprintln!("inspect: {message}");
+    ExitCode::from(2)
+}
+
 fn main() -> ExitCode {
     let mut args = std::env::args().skip(1).peekable();
 
@@ -89,6 +102,7 @@ fn main() -> ExitCode {
     let mut inherit_env = false;
     let mut ansi = false;
     let mut env = Vec::new();
+    let mut cwd: Option<String> = None;
 
     // Options come before the program; everything after it is the
     // program's own, however flag-like it looks.
@@ -100,7 +114,7 @@ fn main() -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             "--version" => {
-                println!("inspect (termlens {})", env!("CARGO_PKG_VERSION"));
+                println!("termlens {}", env!("CARGO_PKG_VERSION"));
                 return ExitCode::SUCCESS;
             }
             "--" => break,
@@ -124,6 +138,19 @@ fn main() -> ExitCode {
                 ansi = true;
                 Ok(())
             }
+            // Checked here rather than left to the builder so the diagnostic
+            // names the flag the user typed; the builder refuses it too, with
+            // a message about `current_dir` the caller never wrote (#312).
+            "--cwd" => {
+                take(&mut args, "--cwd", "PATH", "/tmp", |s| Some(s.to_owned())).and_then(|dir| {
+                    if Path::new(&dir).is_dir() {
+                        cwd = Some(dir);
+                        Ok(())
+                    } else {
+                        Err(format!("bad --cwd {dir:?}, not an existing directory"))
+                    }
+                })
+            }
             "--env" => take(&mut args, "--env", "KEY=VALUE", "NO_COLOR=1", |s| {
                 let (key, value) = s.split_once('=')?;
                 (!key.is_empty()).then(|| (key.to_owned(), value.to_owned()))
@@ -132,14 +159,13 @@ fn main() -> ExitCode {
             other => Err(format!("unknown option {other:?} (try --help)")),
         };
         if let Err(message) = parsed {
-            eprintln!("inspect: {message}");
-            return ExitCode::FAILURE;
+            return fail(&message);
         }
     }
 
     let Some(program) = args.next() else {
         eprintln!("{USAGE}");
-        return ExitCode::FAILURE;
+        return ExitCode::from(2);
     };
 
     let mut builder = Terminal::builder()
@@ -155,48 +181,45 @@ fn main() -> ExitCode {
     for (key, value) in env {
         builder = builder.env(key, value);
     }
+    if let Some(dir) = cwd {
+        builder = builder.current_dir(dir);
+    }
 
     let mut t = match builder.spawn(&program) {
         Ok(t) => t,
-        Err(e) => {
-            eprintln!("inspect: {e}");
-            return ExitCode::FAILURE;
-        }
+        Err(e) => return fail(&e.to_string()),
     };
 
-    let mut out = String::new();
-    match t.wait_exit() {
-        Ok(status) => {
-            out.push_str(&render(&t.screen(), ansi));
-            out.push_str(&format!("\n--- exited: {status} ---\n"));
-        }
+    // The screen to stdout, the trailer to stderr (#340): `inspect … > file`
+    // then saves exactly a screen, while a human at a terminal still sees
+    // both. `termlens inspect` splits the same two streams the same way.
+    let trailer = match t.wait_exit() {
+        Ok(status) => format!("--- exited: {status} ---"),
         Err(termlens::Error::Timeout { .. }) => {
             // Still running at the deadline: settle on a quiet screen
             // instead. The settle is bounded by the deadline too, unless the
             // silence window asked for is itself longer than that.
             let _ = t.wait_idle_for(idle, timeout.max(idle));
-            out.push_str(&render(&t.screen(), ansi));
-            out.push_str("\n--- still running at the deadline (killed on exit) ---\n");
+            "--- still running at the deadline (killed on exit) ---".to_owned()
         }
         Err(e) => {
             // Not "still running": the OS wait itself failed, and saying so
             // is the difference between a slow program and a broken harness.
-            out.push_str(&render(&t.screen(), ansi));
-            out.push_str(&format!("\n--- waiting for the program failed: {e} ---\n"));
+            format!("--- waiting for the program failed: {e} ---")
         }
-    }
+    };
     // One write, and a reader that closed early (`inspect … | head`) is a
     // clean exit rather than a panic on a broken pipe (#223).
     let mut stdout = io::stdout().lock();
-    if let Err(e) = stdout
-        .write_all(out.as_bytes())
+    let code = match stdout
+        .write_all(render(&t.screen(), ansi).as_bytes())
+        .and_then(|()| stdout.write_all(b"\n"))
         .and_then(|()| stdout.flush())
     {
-        if e.kind() == io::ErrorKind::BrokenPipe {
-            return ExitCode::SUCCESS;
-        }
-        eprintln!("inspect: writing the screen failed: {e}");
-        return ExitCode::FAILURE;
-    }
-    ExitCode::SUCCESS
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => ExitCode::SUCCESS,
+        Err(e) => fail(&format!("writing the screen failed: {e}")),
+    };
+    eprintln!("{trailer}");
+    code
 }

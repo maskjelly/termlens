@@ -30,6 +30,14 @@ reads that marker.
 
 ### Fixed
 
+- The `inspect` example now keeps `termlens inspect`'s promised contract.
+  It exits 2 when inspect itself cannot run, instead of 1; the
+  `--- exited: … ---` trailer goes to stderr, instead of trailing the
+  screen on stdout, so `inspect … > file` saves a screen `termlens diff`
+  and `termlens render` read back (#340); and `--version` prints the CLI's
+  one `termlens <version>` line, instead of `inspect (termlens …)`. It
+  also takes `--cwd PATH` like the command it mirrors (#312). (#372)
+
 - A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
   instead of having its body decoded as pixels (#402). The body of those
   three is a path or a shared-memory name, not image data, so a small

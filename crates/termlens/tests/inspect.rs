@@ -48,25 +48,39 @@ fn inspect_runs_and_reports_cli_failures() {
         String::from_utf8_lossy(&sized.stderr)
     );
     let stdout = String::from_utf8_lossy(&sized.stdout);
+    let stderr = String::from_utf8_lossy(&sized.stderr);
     assert!(
         stdout.contains("3 12"),
         "terminal size missing from:\n{stdout}"
     );
     assert!(
-        stdout.contains("--- exited: exit code 0 ---"),
-        "exit status missing from:\n{stdout}"
+        stderr.contains("--- exited: exit code 0 ---"),
+        "exit status missing from:\n{stderr}"
     );
+    assert!(
+        !stdout.contains("---"),
+        "the trailer belongs on stderr, so stdout stays a saved screen:\n{stdout}"
+    );
+    termlens::Screen::parse(&stdout).expect("stdout is a saved screen");
 
     let bad_size = run_inspect(bin, &["--size", "12", "sh"]);
-    assert_eq!(bad_size.status.code(), Some(1));
+    assert_eq!(bad_size.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&bad_size.stderr).contains("expected e.g. 120x40"),
         "malformed-size error missing from:\n{}",
         String::from_utf8_lossy(&bad_size.stderr)
     );
 
+    let bad_cwd = run_inspect(bin, &["--cwd", "/definitely/not/a/directory", "sh"]);
+    assert_eq!(bad_cwd.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&bad_cwd.stderr);
+    assert!(
+        stderr.contains("bad --cwd") && stderr.contains("not an existing directory"),
+        "malformed-cwd error missing from:\n{stderr}"
+    );
+
     let missing_program = run_inspect(bin, &["/definitely/not/a/program"]);
-    assert_eq!(missing_program.status.code(), Some(1));
+    assert_eq!(missing_program.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&missing_program.stderr).starts_with("inspect:"),
         "spawn error missing from:\n{}",
@@ -159,16 +173,16 @@ fn inspect_prints_its_usage_for_help_and_for_a_missing_program() {
 
     let version = run_inspect(bin, &["--version"]);
     assert_eq!(version.status.code(), Some(0));
-    assert!(
-        String::from_utf8_lossy(&version.stdout)
-            .contains(&format!("termlens {}", env!("CARGO_PKG_VERSION"))),
-        "--version names the crate version"
+    assert_eq!(
+        String::from_utf8_lossy(&version.stdout),
+        format!("termlens {}\n", env!("CARGO_PKG_VERSION")),
+        "--version prints the CLI's one version line"
     );
 
     let none = run_inspect(bin, &[]);
     assert_eq!(
         none.status.code(),
-        Some(1),
+        Some(2),
         "no program is still a usage error"
     );
     assert!(none.stdout.is_empty());
@@ -179,7 +193,7 @@ fn inspect_prints_its_usage_for_help_and_for_a_missing_program() {
     );
 
     let unknown = run_inspect(bin, &["--bogus", "sh"]);
-    assert_eq!(unknown.status.code(), Some(1));
+    assert_eq!(unknown.status.code(), Some(2));
     assert!(
         String::from_utf8_lossy(&unknown.stderr).contains("unknown option \"--bogus\""),
         "an unknown option is refused rather than spawned:\n{}",
@@ -207,7 +221,7 @@ fn inspect_takes_its_deadline_and_silence_window_from_flags() {
         (&["--idle"][..], "--idle needs a MILLIS argument"),
     ] {
         let out = run_inspect(bin, args);
-        assert_eq!(out.status.code(), Some(1), "{args:?}");
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(stderr.contains(expect), "{args:?}: got {stderr:?}");
         assert_eq!(
@@ -241,10 +255,15 @@ fn inspect_takes_its_deadline_and_silence_window_from_flags() {
         String::from_utf8_lossy(&cut.stderr)
     );
     let stdout = String::from_utf8_lossy(&cut.stdout);
+    let stderr = String::from_utf8_lossy(&cut.stderr);
     assert!(stdout.contains("painted"), "{stdout}");
     assert!(
-        stdout.contains("--- still running at the deadline (killed on exit) ---"),
-        "{stdout}"
+        stderr.contains("--- still running at the deadline (killed on exit) ---"),
+        "{stderr}"
+    );
+    assert!(
+        !stdout.contains("---"),
+        "the trailer belongs on stderr:\n{stdout}"
     );
     assert!(
         elapsed < std::time::Duration::from_secs(4),
@@ -285,5 +304,32 @@ fn inspect_resolves_a_relative_program_path_from_its_working_directory() {
         String::from_utf8_lossy(&out.stderr)
     );
     assert!(stdout.contains("relative path resolved"), "{stdout}");
-    assert!(stdout.contains("--- exited: exit code 0 ---"), "{stdout}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("--- exited: exit code 0 ---"),
+        "exit status missing from stderr"
+    );
+
+    // `--cwd` moves the child without moving the viewer (#312): started
+    // wherever the test runs, the relative program resolves in the scratch
+    // directory all the same.
+    let out = Command::new(bin)
+        .args([
+            "--cwd",
+            scratch.to_str().expect("utf-8 scratch path"),
+            "./echo",
+            "cwd resolved",
+        ])
+        .output()
+        .expect("failed to run the inspect example");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success(),
+        "inspect failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(stdout.contains("cwd resolved"), "{stdout}");
+    assert!(
+        !stdout.contains("---"),
+        "the trailer belongs on stderr:\n{stdout}"
+    );
 }
