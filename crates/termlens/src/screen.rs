@@ -2554,6 +2554,9 @@ mod tests {
         let _ = s.rect_text(0..3, from..to);
     }
 
+    /// The panic exists to catch a transposed `(col, row)` pair, so it has
+    /// to name the method the caller actually called. These two fail if
+    /// `mask_rect` ever goes back to borrowing `rect_text`'s name.
     #[test]
     #[should_panic(expected = "mask_rect: column range starts at 3 but ends at 0")]
     fn a_reversed_column_range_panics_in_mask_rect() {
