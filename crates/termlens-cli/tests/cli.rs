@@ -67,6 +67,68 @@ fn diff_stays_plain_when_asked_and_exits_zero_on_the_same_picture() -> termlens:
     Ok(())
 }
 
+/// A comparison of two differently sized screens says so in colour mode
+/// too (#365): the plain rendering's second header line, the one naming
+/// the overlap, used to be dropped by `colored()`'s prefix filter.
+#[test]
+fn diff_color_always_keeps_the_overlap_note_and_paints_the_rows() -> termlens::Result<()> {
+    let mut t = termlens::bin!(
+        "termlens",
+        args([
+            "diff",
+            "--color",
+            "always",
+            &data("overlap-before.snap"),
+            &data("overlap-after.snap")
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(1), "{}", t.screen());
+    let s = t.screen();
+    assert!(
+        s.contains("compared over the 4x2 overlap; the rest is clipped"),
+        "the note saying the comparison was partial:\n{s}"
+    );
+    // The rows are still painted: red for what the before screen showed,
+    // green for what the after one shows.
+    let (row, col) = s.find("abXX").expect("the after side");
+    let two = s.cell(row, col + 2).expect("a changed cell");
+    assert_eq!(two.contents(), "X");
+    assert_eq!(two.style().fg, Color::Indexed(2), "{}", s.with_styles());
+    // The before side's changed cells are two blanks here, and ConPTY does
+    // not carry a foreground-only run written around isolated spaces across
+    // the line boundary: on Windows the blanks arrive uncoloured and the
+    // next row's red run is two cells wider (seen in the styles of run
+    // 35188093990). The exact attribution is pinned where the stream
+    // survives, and the note above is asserted everywhere.
+    #[cfg(not(windows))]
+    {
+        let (row, col) = s.find("│ab  │").expect("the before side");
+        let blank = s.cell(row, col + 4).expect("a painted blank");
+        assert_eq!(blank.style().fg, Color::Indexed(1), "{}", s.with_styles());
+    }
+
+    // An empty diff is still the one line, with no colour to go with it.
+    let mut t = termlens::bin!(
+        "termlens",
+        args([
+            "diff",
+            "--color",
+            "always",
+            &data("overlap-before.snap"),
+            &data("overlap-before.snap")
+        ])
+    )?;
+    assert_eq!(t.wait_exit()?.code(), Some(0));
+    let s = t.screen();
+    assert!(s.contains("no difference"), "{s}");
+    assert!(
+        s.find_by(|c| c.style().fg != Color::Default).is_none(),
+        "{}",
+        s.with_styles()
+    );
+    Ok(())
+}
+
 #[test]
 fn render_writes_svg_html_ansi_and_text() -> termlens::Result<()> {
     for (flag, needle) in [("--svg", "<svg"), ("--html", "<pre"), ("--text", "styles:")] {

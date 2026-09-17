@@ -184,6 +184,14 @@ reads that marker.
   usage and exiting 2, instead of silently rendering the last one. With
   `--out` the wrong screen was written and nothing printed to reveal it,
   and a stale path left on the line after an edit went unseen (#364).
+- `termlens diff --color always` prints the line saying a comparison of
+  differently sized screens was partial (#365). `colored()` took exactly
+  one header line and its prefix filter then dropped the overlap note,
+  which starts with neither `…` nor `styles:` — so the note stood in a CI
+  log and vanished at a terminal. The header is now passed through up to
+  the first row, detected by the row shape, and a header line added later
+  will survive the same way. Rows, the `…` line and the `styles:` lines
+  render as before, and `no difference` still prints alone.
 
 ## [0.11.1] - 2026-09-16
 

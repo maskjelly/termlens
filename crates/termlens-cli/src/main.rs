@@ -304,10 +304,33 @@ fn diff(args: &[String]) -> ExitCode {
     }
 }
 
+/// Whether `line` is one of the plain rendering's changed-row lines, the
+/// `{row:>3} │…│…` shape `ScreenDiff`'s `Display` writes
+/// (`crates/termlens/src/screen/diff.rs`). The row number is right-aligned,
+/// so before the first frame there are only digits and spaces and at least
+/// one digit — which no header or trailer line is, so the shape is where
+/// the colour rendering's body begins.
+fn is_row_line(line: &str) -> bool {
+    let Some((number, _)) = line.split_once('│') else {
+        return false;
+    };
+    let Some(number) = number.strip_suffix(' ') else {
+        return false;
+    };
+    number.chars().any(|c| c.is_ascii_digit())
+        && number.chars().all(|c| c.is_ascii_digit() || c == ' ')
+}
+
 /// The diff for a terminal: the plain rendering's header and trailer, and
 /// each changed row side by side with its changed cells painted — red for
 /// what `before` showed, green for what `after` shows — in place of the
 /// `^` marker line, which colour makes redundant.
+///
+/// This owns the body — rows are rebuilt from the screens, painted cell by
+/// cell, and the marker lines dropped with them — and passes everything
+/// else through as printed: the header (every line before the first row,
+/// so the overlap note of a differently sized comparison is carried too,
+/// #365) and the trailer (the unchanged-row count and the style runs).
 fn colored(before: &Screen, after: &Screen, diff: &ScreenDiff) -> String {
     let plain = diff.to_string();
     if diff.is_empty() {
@@ -315,8 +338,19 @@ fn colored(before: &Screen, after: &Screen, diff: &ScreenDiff) -> String {
     }
     let mut lines = plain.lines();
     let mut out = String::new();
-    if let Some(header) = lines.next() {
-        out.push_str(header);
+    // The header is every line before the first row: one today, two when
+    // the sizes differ and the second says what was clipped. Found by the
+    // row's shape rather than a line count, so a header line added later
+    // is passed through without touching this. The row line itself is
+    // consumed here and rebuilt below.
+    for line in lines.by_ref() {
+        if is_row_line(line) {
+            break;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        out.push_str(line);
     }
     let mut changed_rows: Vec<u16> = diff.cells().map(|(row, _, _, _)| row).collect();
     changed_rows.dedup();
