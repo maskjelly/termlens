@@ -17,7 +17,29 @@ reads that marker.
 
 ## [Unreleased]
 
+### Changed
+
+- The published crate no longer ships the integration suite (#385). 86 of
+  its 109 files were tests that cannot run from the tarball at all: they
+  spawn fixture binaries built from workspace siblings a package cannot
+  carry, so inside the unpacked crate that build fails outright. The
+  frozen `tests/compat/` corpus went with them — it is release
+  engineering evidence about this repository, not material a consumer can
+  use. `src/`, `examples/inspect.rs` and the README are unchanged, and
+  the doctests still run.
+
 ### Fixed
+
+- A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
+  instead of having its body decoded as pixels (#402). The body of those
+  three is a path or a shared-memory name, not image data, so a small
+  declared size returned an `Ok` bitmap holding the ASCII of `/tmp`, and a
+  larger one blamed a short payload. `kitty +kitten icat` uses temp-file
+  and shared-memory transmission by default, so this was the common path
+  for a real image, not a synthetic one. An unknown medium is refused for
+  the same reason. `GraphicsPayload::transmission()` reports which one it
+  was, as a new `GraphicsTransmission`; termlens still never opens the
+  path or the mapping.
 
 - A kitty transmission declaring a width or a height of zero is refused as
   malformed instead of decoding to an empty bitmap (#404). `s=` and `v=`
@@ -25,6 +47,53 @@ reads that marker.
   protocol; returning `Ok` of a 0x0 bitmap made `decode()?` succeed and
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
+
+- `Screen::parse` rejects a control character in a grid row instead of
+  folding it into the cell before it: `unicode_width` answers `None` for an
+  `ESC`, a tab or a `DEL` and `Some(0)` for a combining mark, and the parser
+  read both as zero width, so the raw byte survived into every rendering.
+  An `ESC` from a snapshot made `render --svg` write a document `xmllint`
+  refuses to open, and `to_ansi` clear the screen of the reader it was
+  printed to; a combining mark still joins its cell as before (#376).
+
+- `Screen::diff` frames a row of wide characters with `│` at the same
+  display column on the text line and on the marker line. The row columns
+  were padded with `{:<width$}`, which counts `char`s, so a CJK or emoji
+  row pushed the text line's `│` right of the marker line's; both now pad
+  by display width (#380).
+
+- `Screen::unsupported()` preserves parameterless CSI sequences in their
+  written
+  form instead of inserting a synthetic `0` parameter (#394).
+
+- `Screen::unsupported()` reports the xterm title-stack operations
+  `CSI 22 t` and `CSI 23 t`, which were silently dropped (#393). The whole
+  `CSI … t` family was exempt from the record on the grounds that the
+  responder handles it, but the responder only answers the three size
+  reports and names five more in a timeout; push and pop are honoured by
+  nobody. A program that brackets its run with them left `Screen::title()`
+  reporting the pushed-away title and `unsupported()` empty — the pairing
+  the accessor exists to prevent.
+
+- `Screen::to_svg` and `Screen::to_html` render blink (`SGR 5`) instead of
+  dropping it (#378). Every other `Style` attribute already reached all
+  three renderings, so a blinking cell produced the very same SVG and HTML
+  as a steady one — and blink is the attribute the shadow parser exists to
+  recover, so the regression was invisible in exactly the artefact a
+  reviewer looks at. The SVG gets an `<animate>` child on the blinking
+  `<text>`; the HTML gets a `termlens-blink` keyframes rule in a `<style>`
+  element inside the `<pre>`, written only when a run blinks, animating
+  the glyph's colour so a dim blink keeps its dim and the background keeps
+  painting.
+
+- A cursor pending wrap at the right margin is reported on the last cell
+  rather than one column past it (#401). vt100 parks it at `col == cols`;
+  no real terminal reports a column its own width does not have, and the
+  snapshot format refuses one — so a program that filled its last row made
+  `termlens inspect` print a screen `render` and `diff` would not read. The
+  cursor-position report and a graphics placement at the margin were off by
+  the same column. Tab stops still read the raw column, so `HTS` at the
+  margin is dropped rather than clamped onto the last cell.
 
 - The JSON reader refuses a cursor one column past the right edge, as the
   text parser always did (#375). The column bound was `>` where the row

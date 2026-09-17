@@ -162,6 +162,104 @@ fn the_three_renderings_are_pure_functions_of_the_screen() -> termlens::Result<(
     Ok(())
 }
 
+/// Every attribute `Style` carries has to reach all three renderings
+/// (#378). Blink was the one that did not: `to_ansi` wrote SGR 5 while the
+/// SVG and HTML dropped it, so a blinking cell rendered exactly like a
+/// steady one in the two artefacts a reviewer looks at. The table is the
+/// eight attributes, each applied to the same run in turn; every rendering
+/// must differ from the unstyled screen's, and each carries a marker its
+/// own machinery writes.
+///
+/// Conceal is the one that renders by omission — blanks, no text element —
+/// so its SVG check is the absence of the baseline's glyphs, not a marker.
+#[test]
+fn every_style_attribute_reaches_every_rendering() -> termlens::Result<()> {
+    let plain = Screen::parse("size: 2x1  cursor: hidden\nab")?;
+    let (plain_svg, plain_html, plain_ansi) = (plain.to_svg(), plain.to_html(), plain.to_ansi());
+    let cases: [(&str, Option<&str>, &str, &str); 8] = [
+        (
+            "bold",
+            Some("font-weight=\"bold\""),
+            "font-weight:bold",
+            "\x1b[0;1m",
+        ),
+        ("dim", Some("opacity=\"0.6\""), "opacity:0.6", "\x1b[0;2m"),
+        (
+            "italic",
+            Some("font-style=\"italic\""),
+            "font-style:italic",
+            "\x1b[0;3m",
+        ),
+        (
+            "underline",
+            Some("text-decoration=\"underline\""),
+            "text-decoration:underline",
+            "\x1b[0;4m",
+        ),
+        (
+            "blink",
+            Some("<animate attributeName=\"opacity\""),
+            "animation:termlens-blink",
+            "\x1b[0;5m",
+        ),
+        (
+            "reverse",
+            Some("fill=\"#d4d4d4\"/>"),
+            "color:#1e1e1e;background:#d4d4d4",
+            "\x1b[0;7m",
+        ),
+        ("conceal", None, ">  </span>", "\x1b[0;8m"),
+        (
+            "strikethrough",
+            Some("text-decoration=\"line-through\""),
+            "text-decoration:line-through",
+            "\x1b[0;9m",
+        ),
+    ];
+    for (attribute, svg_marker, html_marker, ansi_marker) in cases {
+        let styled = Screen::parse(&format!(
+            "size: 2x1  cursor: hidden\nab\n\nstyles:\n0: 0-1 {attribute}"
+        ))?;
+        let (svg, html, ansi) = (styled.to_svg(), styled.to_html(), styled.to_ansi());
+        assert_ne!(svg, plain_svg, "SVG drops {attribute}:\n{svg}");
+        assert_ne!(html, plain_html, "HTML drops {attribute}:\n{html}");
+        assert_ne!(ansi, plain_ansi, "ANSI drops {attribute}:\n{ansi}");
+        match svg_marker {
+            Some(marker) => assert!(
+                svg.contains(marker),
+                "SVG: no {marker} for {attribute}:\n{svg}"
+            ),
+            None => assert!(!svg.contains("ab"), "conceal must draw no text:\n{svg}"),
+        }
+        assert!(
+            html.contains(html_marker),
+            "HTML: no {html_marker} for {attribute}:\n{html}"
+        );
+        assert!(
+            ansi.contains(ansi_marker),
+            "ANSI: no {ansi_marker:?} for {attribute}:\n{ansi}"
+        );
+    }
+
+    // Dim and blink together, the pair the two animate differently: an SMIL
+    // animation outranks the opacity attribute it animates, so the SVG's
+    // values have to carry dim's 0.6; the HTML animates `color`, so its
+    // `opacity:0.6` and the background stay untouched. Without either, a
+    // dim blink would flash back to full brightness.
+    let both = Screen::parse("size: 2x1  cursor: hidden\nab\n\nstyles:\n0: 0-1 blink dim")?;
+    let svg = both.to_svg();
+    assert!(
+        svg.contains("opacity=\"0.6\"") && svg.contains("values=\"0.6;0\""),
+        "a dim blink keeps dim:\n{svg}"
+    );
+    let html = both.to_html();
+    assert!(
+        html.contains("opacity:0.6;animation:termlens-blink"),
+        "a dim blink keeps dim, and its background paints:\n{html}"
+    );
+    Ok(())
+}
+
 #[cfg(feature = "serde")]
 mod json {
     use super::*;
