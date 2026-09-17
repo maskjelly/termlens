@@ -1203,7 +1203,8 @@ impl Screen {
     /// The grid as the application wrote it: soft-wrapped rows joined with
     /// nothing, every other row ending in `\n`, trailing whitespace stripped
     /// per logical line — [`text`](Self::text) with the wraps undone, blank
-    /// rows below the content included as blank lines just as there.
+    /// rows above and below the content included as blank lines just as
+    /// there.
     ///
     /// A line long enough to wrap is two rows on the grid, and a needle
     /// spanning the wrap is not found by [`contains`](Self::contains) or
@@ -1217,19 +1218,24 @@ impl Screen {
     pub fn logical_text(&self) -> String {
         let mut out = String::new();
         let mut line = String::new();
+        // A leading blank row appends no bytes, so `out.is_empty()` does not
+        // mean "no line emitted yet" — it dropped every blank row above the
+        // first with content (#377).
+        let mut first = true;
         for row in 0..self.rows {
             line.push_str(&self.row_text(row));
             if self.row_wrapped(row) {
                 continue;
             }
-            if !out.is_empty() {
+            if !first {
                 out.push('\n');
             }
+            first = false;
             out.push_str(line.trim_end());
             line.clear();
         }
         if !line.is_empty() {
-            if !out.is_empty() {
+            if !first {
                 out.push('\n');
             }
             out.push_str(line.trim_end());

@@ -3095,7 +3095,7 @@ impl Terminal {
         if modes.mouse_encoding == MouseEncoding::Sgr {
             return Ok(mouse_sgr(button, col, row, press));
         }
-        if col > 222 || row > 222 {
+        if modes.mouse_encoding == MouseEncoding::Legacy && (col > 222 || row > 222) {
             return Err(Error::Input(format!(
                 "({col}, {row}) is unrepresentable in the legacy mouse \
                  encoding the application selected (max 222)"

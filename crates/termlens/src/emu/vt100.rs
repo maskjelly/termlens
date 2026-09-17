@@ -164,6 +164,10 @@ impl Vt100Emulator {
     /// nothing and only moves the cursor.
     fn apply_tabs(&mut self, op: TabOp, before: &[u8], last: &[u8]) {
         self.feed_staged(before);
+        // The *raw* column, not the clamped one a snapshot reports: `HTS`
+        // at the right margin is dropped by `TabStops::set`, on purpose —
+        // clamping it would set a stop the application never asked for,
+        // and that stop outlives the wrap once the grid is widened.
         let col = self.parser.screen().cursor_position().1;
         let target = self.tracker.tab_op(op, col);
         self.feed_staged(last);
@@ -183,7 +187,7 @@ impl Vt100Emulator {
     /// payload, and the one an application gets wrong when a picture drifts
     /// out from under its own labels.
     fn record_graphics(&mut self, mut payload: GraphicsPayload) {
-        payload.place(self.parser.screen().cursor_position());
+        payload.place(self.cursor_position());
         let kept = payload.data().map_or(0, <[u8]>::len);
         let log = Arc::make_mut(&mut self.graphics);
         log.push(payload);
@@ -219,6 +223,12 @@ impl Vt100Emulator {
 
         // Below the cap, history only grows: the new rows are exactly
         // `captured..len`, and an unchanged length means nothing scrolled.
+        // RIS (`ESC c`) is the one write that breaks that monotonicity:
+        // it rebuilds the screen and empties the history, while the rows
+        // already copied here survive. A length below the mark is that
+        // rebuild — the rows now at the front are new and have to be read
+        // from the start, or everything under the stale mark is skipped
+        // (#391).
         //
         // At the cap, vt100 evicts from the front and the length stops
         // changing, so it no longer reveals growth — and an unchanged
@@ -233,6 +243,9 @@ impl Vt100Emulator {
         // 352ms with retention off, 327ms below the cap (free, within
         // noise), 639ms on this path — under 2x, for a workload well past
         // what a test drives.
+        if len < self.captured {
+            self.captured = 0;
+        }
         let at_cap = len == self.scrollback_len;
         if !at_cap && len == self.captured {
             screen.set_scrollback(0);
@@ -297,6 +310,17 @@ impl Vt100Emulator {
         }
         self.captured = len;
         screen.set_scrollback(0);
+    }
+    /// The cursor as a snapshot should report it: a column pending wrap
+    /// sits one past the last cell inside the backend, and no terminal
+    /// reports a column its own width does not have (#401). Clamping here
+    /// keeps the snapshot, the cursor-position report and a graphics
+    /// placement agreeing with the grid they describe. Tab stops read the
+    /// raw column instead — see `apply_tabs`.
+    fn cursor_position(&self) -> (u16, u16) {
+        let screen = self.parser.screen();
+        let (row, col) = screen.cursor_position();
+        (row, col.min(screen.size().1.saturating_sub(1)))
     }
 }
 
@@ -367,6 +391,20 @@ impl Emulator for Vt100Emulator {
                     self.feed(SOFT_RESET_REPLAY);
                     None
                 }
+                SeqEvent::HardReset => {
+                    // Rows that scrolled since the last capture exist only
+                    // in vt100's history, and the reset is about to discard
+                    // it. The feed is split at the reset: everything before
+                    // it goes first — one write can carry lines and the
+                    // reset together — and the capture that feed runs takes
+                    // those rows. The reset then follows alone, and the
+                    // capture its feed runs sees an emptied history, which
+                    // is how the mark learns to start over (#391).
+                    self.feed_staged(&bytes[fed..i]);
+                    fed = i + 1;
+                    self.feed_staged(&bytes[i..=i]);
+                    None
+                }
                 SeqEvent::Tabs(op) => {
                     self.apply_tabs(op, &bytes[fed..i], &bytes[i..=i]);
                     fed = i + 1;
@@ -434,7 +472,7 @@ impl Emulator for Vt100Emulator {
                 cells.push(converted);
             }
         }
-        let (cursor_row, cursor_col) = screen.cursor_position();
+        let (cursor_row, cursor_col) = self.cursor_position();
         let state = TermState {
             title: self.tracker.title(),
             alternate_screen: screen.alternate_screen(),
@@ -929,6 +967,21 @@ mod tests {
     }
 
     #[test]
+    fn a_pending_wrap_cursor_stays_inside_the_grid_and_round_trips() {
+        let mut emu = Vt100Emulator::new(3, 10, 0, crate::graphics::DEFAULT_CAPTURE, false);
+        feed_all(&mut emu, b"0123456789");
+        let screen = emu.snapshot();
+        assert_eq!(screen.cursor(), (0, 9, true));
+        let saved = screen.to_string();
+        assert_eq!(
+            Screen::parse(&saved)
+                .expect("saved screen round-trips")
+                .to_string(),
+            saved
+        );
+    }
+
+    #[test]
     fn mid_sequence_tracks_partial_escape() {
         let mut emu = Vt100Emulator::new(4, 10, 0, crate::graphics::DEFAULT_CAPTURE, false);
         feed_all(&mut emu, b"text\x1b[3");
@@ -1045,6 +1098,30 @@ mod tests {
         assert_eq!(emu.snapshot().scrollback_text(), "b\nc");
         feed_all(&mut emu, b"g\r\nh\r\n");
         assert_eq!(emu.snapshot().scrollback_text(), "d\ne");
+    }
+
+    #[test]
+    fn a_hard_reset_keeps_history_across_every_feed_boundary() {
+        // The same stream split in different places, which is the whole
+        // bug: the mark was compared by length alone, so a feed that put
+        // the reset and the following rows together could land on the old
+        // mark and skip every new row (#391). Rows from before the reset
+        // are recoverable only while vt100 still holds them, so the
+        // boundaries around the reset byte are the ones that matter.
+        let stream =
+            b"1|\r\n2|\r\n3|\r\n4|\r\n5|\r\n6|\r\n\x1bcA|\r\nB|\r\nC|\r\nD|\r\nE|\r\nF|\r\n";
+        let expected = "1|\n2|\n3|\nA|\nB|\nC|";
+        // All in one feed, inside the pre-reset lines, before the reset,
+        // between `ESC` and `c`, right after the reset, inside the rows
+        // after it, and split after the end.
+        for split in [0, 6, 24, 25, 26, 40, stream.len()] {
+            let mut emu = Vt100Emulator::new(4, 20, 20, crate::graphics::DEFAULT_CAPTURE, false);
+            feed_all(&mut emu, &stream[..split]);
+            feed_all(&mut emu, &stream[split..]);
+            let screen = emu.snapshot();
+            assert_eq!(screen.scrollback_text(), expected, "split at {split}");
+            assert_eq!(screen.text(), "D|\nE|\nF|\n", "split at {split}");
+        }
     }
 
     #[test]

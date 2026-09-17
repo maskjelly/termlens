@@ -113,7 +113,7 @@ impl<'de> Deserialize<'de> for Screen {
                 cells.len()
             )));
         }
-        if wire.cursor.row >= wire.rows.max(1) || wire.cursor.col > wire.cols {
+        if wire.cursor.row >= wire.rows.max(1) || wire.cursor.col >= wire.cols.max(1) {
             return Err(D::Error::custom(format!(
                 "cursor {},{} is outside a {}x{} screen",
                 wire.cursor.row, wire.cursor.col, wire.cols, wire.rows

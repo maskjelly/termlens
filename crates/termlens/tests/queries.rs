@@ -80,6 +80,33 @@ fn cursor_position_reports_the_position_at_the_query() -> termlens::Result<()> {
     windows,
     ignore = "ConPTY answers or eats the child's queries itself, so they never reach the responder (#149)"
 )]
+fn cursor_position_at_the_right_margin_reports_the_last_column() -> termlens::Result<()> {
+    let mut t = common::spawn_emit(
+        Terminal::builder()
+            .size(10, 3)
+            .timeout(Duration::from_secs(10)),
+        &[
+            "--raw-mode",
+            "0123456789",
+            "--csi",
+            "6n",
+            "\nunblocked:",
+            "--read",
+            "7",
+            "--wait",
+        ],
+    )?;
+    t.wait_until(|s| s.contains("unblocked:") && s.contains("E[1;10R"))?;
+    t.send(Key::Enter)?;
+    assert!(t.wait_exit()?.success());
+    Ok(())
+}
+
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "ConPTY answers or eats the child's queries itself, so they never reach the responder (#149)"
+)]
 fn device_attribute_probes_are_unblocked() -> termlens::Result<()> {
     // DA1 reply is ESC [ ? 6 2 ; 2 2 c = 9 bytes. This is also the exact
     // pattern kitty-protocol probes rely on: the DA1 answer arriving tells
@@ -373,6 +400,7 @@ fn decrqss_and_palette_queries_are_named() {
     for (label, query, shape) in [
         ("DECRQSS", r"\eP$qm\e\\", "^[P$qm"),
         ("OSC 4", r"\e]4;1;?\a", "^[]4;1;?"),
+        ("XTVERSION", r"\e[>q", "^[[>q"),
     ] {
         let mut t = emit(
             Duration::from_millis(400),

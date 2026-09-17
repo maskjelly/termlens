@@ -230,6 +230,74 @@ fn mouse_reports_follow_the_utf8_encoding() -> termlens::Result<()> {
     Ok(())
 }
 
+/// UTF-8 mouse mode exists so coordinates beyond the legacy 222-cell cap
+/// remain representable. Pin a real wide-terminal click on the wire.
+#[test]
+#[cfg_attr(
+    windows,
+    ignore = "the wire is read in raw mode, a tcsetattr, and ConPTY turns typed bytes into console events rather than forwarding them (#149)"
+)]
+fn utf8_mouse_reaches_past_the_legacy_limit() -> termlens::Result<()> {
+    let mut t = util::spawn_emit(
+        Terminal::builder()
+            .size(300, 24)
+            .timeout(Duration::from_secs(10)),
+        &[
+            "--raw-mode",
+            "--raw",
+            r"\e[?1000h\e[?1005h",
+            "READY",
+            "--read-hex",
+            "7",
+            " WIRE-EOF",
+            "--wait-for",
+            "QUIT",
+        ],
+    )?;
+    t.wait_until(|s| s.contains("READY"))?;
+
+    // 32 + 1 + 250 = U+011B, encoded as c4 9b in UTF-8.
+    t.click(250, 3)?;
+    t.send_str("\n\n\n\n\n\n\n")?;
+    t.wait_until(|s| s.contains("WIRE-EOF"))?;
+
+    let wire = t.screen().row_text(0);
+    assert!(
+        wire.contains("1b5b4d20c49b24"),
+        "expected ESC [ M 0x20 c4 9b 0x24 (UTF-8 column 250), got: {wire}"
+    );
+    t.send_str("QUIT\n")?;
+    assert!(t.wait_exit()?.success());
+
+    // The same coordinate remains impossible when the application selected
+    // the legacy encoding rather than UTF-8.
+    let mut legacy = util::spawn_emit(
+        Terminal::builder()
+            .size(300, 24)
+            .timeout(Duration::from_secs(10)),
+        &[
+            "--raw-mode",
+            "--raw",
+            r"\e[?1000h",
+            "READY",
+            "--wait-for",
+            "QUIT",
+        ],
+    )?;
+    legacy.wait_until(|s| s.contains("READY"))?;
+    let err = legacy
+        .click(223, 1)
+        .expect_err("legacy mouse encoding must refuse column 223");
+    assert!(
+        err.to_string()
+            .contains("unrepresentable in the legacy mouse encoding"),
+        "{err}"
+    );
+    legacy.send_str("QUIT\n")?;
+    assert!(legacy.wait_exit()?.success());
+    Ok(())
+}
+
 /// Everything the mouse API can express, captured off the wire under
 /// SGR encoding with full (any-event) tracking.
 #[test]
