@@ -17,6 +17,17 @@ reads that marker.
 
 ## [Unreleased]
 
+### Changed
+
+- The published crate no longer ships the integration suite (#385). 86 of
+  its 109 files were tests that cannot run from the tarball at all: they
+  spawn fixture binaries built from workspace siblings a package cannot
+  carry, so inside the unpacked crate that build fails outright. The
+  frozen `tests/compat/` corpus went with them — it is release
+  engineering evidence about this repository, not material a consumer can
+  use. `src/`, `examples/inspect.rs` and the README are unchanged, and
+  the doctests still run.
+
 ### Fixed
 
 - A kitty transmission declaring a width or a height of zero is refused as
