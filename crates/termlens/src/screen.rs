@@ -1714,8 +1714,8 @@ impl Screen {
     /// does and for the same reason.
     #[must_use]
     pub fn mask_rect(&self, cols: impl RangeBounds<u16>, rows: impl RangeBounds<u16>) -> Screen {
-        let (col_start, col_end) = clamp_range(&cols, self.cols, "column");
-        let (row_start, row_end) = clamp_range(&rows, self.rows, "row");
+        let (col_start, col_end) = clamp_range(&cols, self.cols, "column", "mask_rect");
+        let (row_start, row_end) = clamp_range(&rows, self.rows, "row", "mask_rect");
         self.masked(
             |row, col, _| {
                 (row_start..row_end).contains(&row) && (col_start..col_end).contains(&col)
@@ -1934,8 +1934,8 @@ impl Screen {
     /// reasonable thing to do.
     #[must_use]
     pub fn rect_text(&self, cols: impl RangeBounds<u16>, rows: impl RangeBounds<u16>) -> String {
-        let (col_start, col_end) = clamp_range(&cols, self.cols, "column");
-        let (row_start, row_end) = clamp_range(&rows, self.rows, "row");
+        let (col_start, col_end) = clamp_range(&cols, self.cols, "column", "rect_text");
+        let (row_start, row_end) = clamp_range(&rows, self.rows, "row", "rect_text");
         let mut out = String::new();
         for row in row_start..row_end {
             if row > row_start {
@@ -2181,9 +2181,9 @@ fn nfc(s: &str) -> String {
 ///
 /// # Panics
 ///
-/// If the range runs backwards, naming the axis. See [`Screen::rect_text`]
-/// for why this is a panic and not an error.
-fn clamp_range(range: &impl RangeBounds<u16>, len: u16, axis: &str) -> (u16, u16) {
+/// If the range runs backwards, naming the caller and the axis. See
+/// [`Screen::rect_text`] for why this is a panic and not an error.
+fn clamp_range(range: &impl RangeBounds<u16>, len: u16, axis: &str, caller: &str) -> (u16, u16) {
     let start = match range.start_bound() {
         Bound::Included(&s) => s,
         Bound::Excluded(&s) => s.saturating_add(1),
@@ -2199,7 +2199,7 @@ fn clamp_range(range: &impl RangeBounds<u16>, len: u16, axis: &str) -> (u16, u16
     // bounds are clamped to the same `len`.
     assert!(
         start <= end,
-        "rect_text: {axis} range starts at {start} but ends at {end}"
+        "{caller}: {axis} range starts at {start} but ends at {end}"
     );
     (start.min(len), end.min(len))
 }
@@ -2545,7 +2545,7 @@ mod tests {
     /// reaches a running test is the computed one — which is also the shape
     /// a swapped-argument mistake actually takes.
     #[test]
-    #[should_panic(expected = "column range starts at 3 but ends at 0")]
+    #[should_panic(expected = "rect_text: column range starts at 3 but ends at 0")]
     fn a_reversed_column_range_panics() {
         let s = screen(10, 3, &["0123456789", "abcdefghij", "xyz"]);
         let (from, to) = (3, 0);
@@ -2553,11 +2553,30 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "row range starts at 2 but ends at 0")]
+    #[should_panic(expected = "rect_text: row range starts at 2 but ends at 0")]
     fn a_reversed_row_range_panics() {
         let s = screen(10, 3, &["0123456789", "abcdefghij", "xyz"]);
         let (from, to) = (2, 0);
         let _ = s.rect_text(0..3, from..to);
+    }
+
+    /// The panic exists to catch a transposed `(col, row)` pair, so it has
+    /// to name the method the caller actually called. These two fail if
+    /// `mask_rect` ever goes back to borrowing `rect_text`'s name.
+    #[test]
+    #[should_panic(expected = "mask_rect: column range starts at 3 but ends at 0")]
+    fn a_reversed_column_range_panics_in_mask_rect() {
+        let s = screen(10, 3, &["0123456789", "abcdefghij", "xyz"]);
+        let (from, to) = (3, 0);
+        let _ = s.mask_rect(from..to, 0..2);
+    }
+
+    #[test]
+    #[should_panic(expected = "mask_rect: row range starts at 2 but ends at 0")]
+    fn a_reversed_row_range_panics_in_mask_rect() {
+        let s = screen(10, 3, &["0123456789", "abcdefghij", "xyz"]);
+        let (from, to) = (2, 0);
+        let _ = s.mask_rect(0..3, from..to);
     }
 
     /// Out-of-range is not the same mistake and stays clamped: asking for

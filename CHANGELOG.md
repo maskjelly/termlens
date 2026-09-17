@@ -17,7 +17,29 @@ reads that marker.
 
 ## [Unreleased]
 
+### Changed
+
+- The published crate no longer ships the integration suite (#385). 86 of
+  its 109 files were tests that cannot run from the tarball at all: they
+  spawn fixture binaries built from workspace siblings a package cannot
+  carry, so inside the unpacked crate that build fails outright. The
+  frozen `tests/compat/` corpus went with them — it is release
+  engineering evidence about this repository, not material a consumer can
+  use. `src/`, `examples/inspect.rs` and the README are unchanged, and
+  the doctests still run.
+
 ### Fixed
+
+- A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
+  instead of having its body decoded as pixels (#402). The body of those
+  three is a path or a shared-memory name, not image data, so a small
+  declared size returned an `Ok` bitmap holding the ASCII of `/tmp`, and a
+  larger one blamed a short payload. `kitty +kitten icat` uses temp-file
+  and shared-memory transmission by default, so this was the common path
+  for a real image, not a synthetic one. An unknown medium is refused for
+  the same reason. `GraphicsPayload::transmission()` reports which one it
+  was, as a new `GraphicsTransmission`; termlens still never opens the
+  path or the mapping.
 
 - A kitty transmission declaring a width or a height of zero is refused as
   malformed instead of decoding to an empty bitmap (#404). `s=` and `v=`
@@ -25,6 +47,14 @@ reads that marker.
   protocol; returning `Ok` of a 0x0 bitmap made `decode()?` succeed and
   the assertion after it silently see nothing. Sixel already declined
   this by falling back to the painted extent.
+
+- `Screen::parse` rejects a control character in a grid row instead of
+  folding it into the cell before it: `unicode_width` answers `None` for an
+  `ESC`, a tab or a `DEL` and `Some(0)` for a combining mark, and the parser
+  read both as zero width, so the raw byte survived into every rendering.
+  An `ESC` from a snapshot made `render --svg` write a document `xmllint`
+  refuses to open, and `to_ansi` clear the screen of the reader it was
+  printed to; a combining mark still joins its cell as before (#376).
 
 - `Screen::logical_text()` keeps the blank rows above the first row with
   content, so on a screen with no wraps it is `Screen::text()` exactly —
