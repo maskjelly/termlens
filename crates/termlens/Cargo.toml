@@ -4,6 +4,14 @@ description = "Headless PTY test harness for CLI/TUI apps — spawn in a real PT
 keywords = ["pty", "terminal", "testing", "tui", "snapshot"]
 categories = ["development-tools::testing", "command-line-interface"]
 readme = "../../README.md"
+# The integration suite spawns fixture binaries built from workspace siblings
+# (`cargo build -p <fixture>` against `fixtures/`, which is `publish = false`).
+# A package cannot carry those siblings, so inside the unpacked tarball that
+# build fails with "package ID specification did not match any packages" and
+# the tests cannot run at all. `tests/compat/` is frozen release-engineering
+# evidence about this repository, not the crate. Exclude the lot rather than
+# ship downloads that are mostly dead weight (#385).
+exclude = ["tests/"]
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,7 +1,12 @@
-# Flake hunter: the whole test suite, 100 times, on all three OSes.
+# Flake hunter: the whole test suite under --all-features, 100 times, on all
+# three OSes.
 #
 # A flaky test harness is worse than none — this workflow is the credibility
 # gate. Run it before every release and whenever wait/timing code changes.
+# --all-features is what makes "whole" true, and it is the same selection the
+# ci.yml `test` job runs: without it the eighteen `decode` tests, three
+# `regex` ones and a doctest never ran here at all, including the one wait
+# test that sleeps and then asserts on a deadline (#382).
 #
 # Windows joined in 0.10 (#290), when its ci.yml leg became a required check
 # (#280) and therefore acquired a flake budget of zero. It is here for one
@@ -131,7 +136,7 @@ jobs:
           # they build the same tree, and the default key is per-job.
           shared-key: stress
       - name: Build test binaries once
-        run: cargo build --workspace --release --all-targets # bins too: fixture binaries must exist before iteration 1
+        run: cargo build --workspace --release --all-targets --all-features # bins too: fixture binaries must exist before iteration 1
       - name: Run the suite repeatedly
         env:
           ITERS: ${{ inputs.iterations || '100' }}
@@ -145,7 +150,7 @@ jobs:
           echo "${THREADS} thread(s): ${per} iterations of ${ITERS}"
           for i in $(seq "$per"); do
             echo "::group::${THREADS} threads, iteration ${i}/${per}"
-            cargo test --workspace --release -- --test-threads="$THREADS" \
+            cargo test --workspace --release --all-features -- --test-threads="$THREADS" \
               || { echo "::error::suite flaked at ${THREADS} thread(s), iteration ${i}/${per}"; exit 1; }
             echo "::endgroup::"
           done
