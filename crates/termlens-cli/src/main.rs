@@ -62,7 +62,7 @@ repeatable --env sets selected values.
 The screen goes to stdout and nothing else does, so `inspect … > file`
 saves a screen that `termlens diff` and `termlens render` read back. The
 trailer that says what the program did — its exit status, or that it was
-still running at the deadline — goes to stderr. Exit code 2 means inspect
+still running when the wait ended — goes to stderr. Exit code 2 means inspect
 itself could not run: bad arguments, or a program that could not be spawned.";
 
 const DIFF_USAGE: &str = "\
@@ -200,9 +200,11 @@ fn strip_insta_header(text: &str) -> &str {
 /// `inspect` before 0.11 wrote its `--- exited: … ---` trailer to stdout,
 /// so a screen saved with `> file` then carried it (#340). The trailer now
 /// goes to stderr, and a file saved that way still reads: the last
-/// non-blank line is dropped when it is one of the three trailers
-/// `inspect` writes — exactly those, so a grid row that happens to start
-/// with `---` is left alone.
+/// non-blank line is dropped when it is one of the trailers `inspect`
+/// writes — exactly those, so a grid row that happens to start with `---`
+/// is left alone. `--- still running` is matched as a prefix so that both
+/// of the two still-running trailers (#374) and the single one every
+/// release up to 0.11.2 wrote are all stripped from a saved screen.
 fn strip_inspect_trailer(text: &str) -> &str {
     let trimmed = text.trim_end_matches('\n');
     let start = trimmed.rfind('\n').map_or(0, |at| at + 1);
@@ -210,7 +212,7 @@ fn strip_inspect_trailer(text: &str) -> &str {
     let is_trailer = last.ends_with(" ---")
         && [
             "--- exited: ",
-            "--- still running at the deadline",
+            "--- still running",
             "--- waiting for the program failed: ",
         ]
         .iter()
@@ -623,16 +625,21 @@ fn inspect(args: Vec<String>) -> ExitCode {
     // probe then says which arm fired; it only reaps (and drains the final
     // bytes) when the child is already gone, so an exit lands on its own
     // trailer with the finished screen.
-    let still_running = "--- still running at the deadline (killed on exit) ---";
+    // Two trailers for a child that outlived the wait, because the wait can
+    // now end two ways and "at the deadline" is only true of one of them.
+    // `wait_idle_for` returning `Ok` means the output went quiet *or* the
+    // terminal reached EOF; neither is the deadline, and a TUI snapshotted
+    // 200ms into a 30s budget must not claim otherwise.
+    let still_running = "--- still running (killed on exit) ---";
+    let at_the_deadline = "--- still running at the deadline (killed on exit) ---";
     let trailer = match t.wait_idle_for(idle, timeout) {
         Ok(()) => match t.wait_exit_for(REAP_GRACE) {
             Ok(status) => format!("--- exited: {status} ---"),
             Err(termlens::Error::Timeout { .. }) => still_running.to_owned(),
             Err(e) => format!("--- waiting for the program failed: {e} ---"),
         },
-        // Output never went silent for `idle`: the deadline ended the wait,
-        // which is the same trailer the sequential wait produced.
-        Err(termlens::Error::Timeout { .. }) => still_running.to_owned(),
+        // Output never went silent for `idle`: the deadline ended the wait.
+        Err(termlens::Error::Timeout { .. }) => at_the_deadline.to_owned(),
         Err(e) => format!("--- waiting for the program failed: {e} ---"),
     };
     let code = print(&format!("{}\n", inspect_render(&t.screen(), ansi)));

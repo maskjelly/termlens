@@ -735,7 +735,7 @@ line is an `Error::Parse` naming it. termlens itself writes two things
 - **Above:** the insta header, `---` / `source: …` / `---`, which a `.snap`
   file carries over the content that was snapshotted.
 - **Below:** the trailer `termlens inspect` wrote to stdout before 0.11 —
-  `--- exited: … ---`, `--- still running at the deadline … ---`,
+  `--- exited: … ---`, `--- still running … ---` (both forms),
   `--- waiting for the program failed: … ---`. Since 0.11 the trailer goes
   to **stderr** and stdout carries the screen alone, so `termlens inspect
   prog > file` saves a screen `diff` and `render` read back (#340); the

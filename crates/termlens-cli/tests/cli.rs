@@ -1171,6 +1171,14 @@ fn inspect_idle_window_decides_what_the_deadline_snapshot_holds() -> termlens::R
 /// from the 5s default: the default would hold it, the flag must not. The
 /// harness deadline is generous because it also covers the spawn
 /// (CONTRIBUTING §3).
+///
+/// `--idle 5000` is what keeps this about `--timeout` since #374: the wait
+/// now ends on the silence window too, and this child goes quiet the
+/// instant it prints `first`, so the default 300ms window would end the
+/// wait at 300ms whatever the deadline said — and the test would pass
+/// against a `--timeout` that did nothing at all. A window above the
+/// deadline can never be satisfied inside it, so the deadline is once again
+/// the thing being measured, and the trailer says so.
 #[test]
 #[cfg_attr(windows, ignore = "the program under inspection is a POSIX shell")]
 fn inspect_timeout_snapshots_a_program_that_outlives_it() -> termlens::Result<()> {
@@ -1185,6 +1193,8 @@ fn inspect_timeout_snapshots_a_program_that_outlives_it() -> termlens::Result<()
             "60x3",
             "--timeout",
             "3",
+            "--idle",
+            "5000",
             "sh",
             "-c",
             "printf first; sleep 4; printf ' second'; sleep 30"
@@ -1241,8 +1251,9 @@ fn inspect_resolves_on_the_idle_window_before_the_deadline() -> termlens::Result
         "the output before idleness is kept: {s}"
     );
     assert!(
-        s.contains("--- still running at the deadline (killed on exit) ---"),
-        "the program never exited, so the trailer says so: {s}"
+        s.contains("--- still running (killed on exit) ---"),
+        "the program never exited, so the trailer says so — and the window \
+         ended the wait, so it does not claim the deadline did: {s}"
     );
     assert!(
         elapsed < std::time::Duration::from_secs(10),
@@ -1359,8 +1370,8 @@ fn inspect_reports_still_running_when_the_child_closes_its_terminal() -> termlen
     let stderr = String::from_utf8(out.stderr).expect("utf-8");
     assert_eq!(
         stderr.trim_end(),
-        "--- still running at the deadline (killed on exit) ---",
-        "{stderr:?}"
+        "--- still running (killed on exit) ---",
+        "the EOF ended the wait, not the 30s deadline: {stderr:?}"
     );
     // It returned on the EOF, not the 30s deadline: the reap grace is the
     // only wait left, and the ceiling is generous for the spawn

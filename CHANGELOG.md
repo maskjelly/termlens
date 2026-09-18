@@ -25,6 +25,21 @@ reads that marker.
   followed the flag; a WHEN that is none of the three words is named quoted
   and alone, in both spellings of the flag (#452).
 
+- `termlens inspect` ends its wait on whichever comes first — the program
+  exits, or its output has been silent for `--idle` — instead of waiting
+  the whole `--timeout` and only then consulting `--idle` (#374). A TUI
+  that never exits paid the full deadline on every run, however complete
+  the screen already was: 6.07s for a screen done in 1ms in the issue's
+  reproduction, 0.76s now. The exit codes are unchanged and the wait is
+  still bounded by `--timeout`. A child that outlives the wait now has two
+  trailers rather than one, because the wait can end two ways and only one
+  of them is the deadline: `--- still running (killed on exit) ---` when
+  the silence window or an EOF ended it, and the existing
+  `--- still running at the deadline (killed on exit) ---` when the
+  deadline did. Both are stripped from a saved screen, as is the single
+  form every release up to 0.11.2 wrote. `examples/inspect.rs` mirrors the
+  command, so it moves with it.
+
 ## [0.11.2] - 2026-09-17
 
 ### Added
@@ -76,13 +91,6 @@ reads that marker.
   shadow's stream let that parser swallow the next printable character: a
   debug build panicked on the divergence, and a release build read blink,
   conceal or strikethrough from the wrong cell (#390).
-- `termlens inspect` ends its wait on whichever comes first — the program
-  exits, or its output has been silent for `--idle` — instead of waiting
-  the whole `--timeout` and only then consulting `--idle` (#374). A TUI
-  that never exits paid the full deadline on every run, however complete
-  the screen already was: 6.07s for a screen done in 1ms, in the issue's
-  reproduction. Both the trailers and the exit codes are unchanged, and the
-  wait is still bounded by `--timeout`.
 
 - A kitty `t=f`, `t=t` or `t=s` transmission is refused by `decode()`
   instead of having its body decoded as pixels (#402). The body of those

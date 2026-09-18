@@ -257,8 +257,9 @@ fn inspect_takes_its_deadline_and_silence_window_from_flags() {
 
     // A one-second deadline against a program that sleeps for thirty:
     // inspect must report "still running" long before the default five
-    // seconds would have, with the output painted before the deadline
-    // still on the screen it prints.
+    // seconds would have, with the output painted before the wait ended
+    // still on the screen it prints. The 50ms silence window is what ends
+    // it now (#374), inside the 1s bound rather than at it.
     let started = std::time::Instant::now();
     let cut = run_inspect(
         bin,
@@ -282,8 +283,9 @@ fn inspect_takes_its_deadline_and_silence_window_from_flags() {
     let stderr = String::from_utf8_lossy(&cut.stderr);
     assert!(stdout.contains("painted"), "{stdout}");
     assert!(
-        stderr.contains("--- still running at the deadline (killed on exit) ---"),
-        "{stderr}"
+        stderr.contains("--- still running (killed on exit) ---"),
+        "the 50ms window ended the wait, so the trailer does not claim the \
+         1s deadline did: {stderr}"
     );
     assert!(
         !stdout.contains("---"),

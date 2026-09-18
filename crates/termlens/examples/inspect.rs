@@ -8,9 +8,9 @@
 //! cargo run --example inspect -- --env NO_COLOR=1 my-app
 //! ```
 //!
-//! Waits for the program to exit (up to the deadline, `--timeout`, five
-//! seconds by default) or, if it keeps running, for a window of output
-//! silence (`--idle`, 300ms by default) — then prints the screen. Five
+//! The wait ends on whichever comes first: the program exits, or its
+//! output has been silent for a window (`--idle`, 300ms by default) —
+//! bounded by the deadline (`--timeout`, five seconds by default). Five
 //! seconds is what a test suite wants, where a deadline exists to turn a
 //! hang into a readable failure; a person at a terminal pointing this at an
 //! application that loads a large file or compiles before it draws is
@@ -21,7 +21,7 @@
 //! The screen alone goes to stdout and the trailer to stderr, so
 //! `inspect … > file` writes a saved screen. Exit code 0 means inspect ran
 //! and printed a screen; the trailer says what the program did — its exit
-//! status, or that it was still running at the deadline. Exit code 2 means
+//! status, or that it was still running when the wait ended. Exit code 2 means
 //! inspect itself could not run: bad arguments, or a program that could
 //! not be spawned. A viewer, not a gate: the program's own status is
 //! reported, not propagated.
@@ -35,22 +35,30 @@ use termlens::Terminal;
 
 /// The one copy of the usage text: `--help` prints it to stdout and exits
 /// 0, a missing program prints it to stderr and exits 2 (#229).
+/// How long to give the reap after the EOF that ended the idle wait: the
+/// kernel can report the terminal's close a scheduling hair before the
+/// child's status is collectable, and the trailer should say exited when
+/// the program did exit. `termlens inspect` gives the same width, for the
+/// same reason (#374).
+const REAP_GRACE: Duration = Duration::from_millis(500);
+
 const USAGE: &str = "\
 usage: inspect [--size COLSxROWS] [--timeout SECONDS] [--idle MILLIS]
                [--cwd PATH] [--inherit-env] [--ansi]
                [--env KEY=VALUE]... <program> [args…]
 
-Runs <program> in an 80x24 pseudo-terminal (or --size), waits for it to
-exit or for the deadline (--timeout, default 5 seconds), and prints the
-rendered screen. A program still running at the deadline is snapshotted
-after --idle milliseconds (default 300) of output silence, then killed.
+Runs <program> in an 80x24 pseudo-terminal (or --size) and prints the
+rendered screen. The wait ends on whichever comes first: the program
+exits, or its output has been silent for --idle milliseconds (default
+300), bounded by --timeout (default 5 seconds); a program still running
+when it ends is killed.
 The child environment is cleared by default except for PATH; --inherit-env
 keeps the caller's environment, and repeatable --env sets selected values.
 --cwd runs the program in PATH, which must be an existing directory.
 
 The screen goes to stdout and nothing else does, so `inspect … > file`
 saves a screen; the trailer that says what the program did — its exit
-status, or that it was still running at the deadline — goes to stderr.
+status, or that it was still running when the wait ended — goes to stderr.
 Exit code 0: a screen was printed. Exit code 2: inspect itself could not
 run — bad arguments, or a program that could not be spawned.
 
@@ -206,20 +214,28 @@ fn main() -> ExitCode {
     // The screen to stdout, the trailer to stderr (#340): `inspect … > file`
     // then saves exactly a screen, while a human at a terminal still sees
     // both. `termlens inspect` splits the same two streams the same way.
-    let trailer = match t.wait_exit() {
-        Ok(status) => format!("--- exited: {status} ---"),
-        Err(termlens::Error::Timeout { .. }) => {
-            // Still running at the deadline: settle on a quiet screen
-            // instead. The settle is bounded by the deadline too, unless the
-            // silence window asked for is itself longer than that.
-            let _ = t.wait_idle_for(idle, timeout.max(idle));
-            "--- still running at the deadline (killed on exit) ---".to_owned()
-        }
-        Err(e) => {
+    // Resolve on whichever comes first — the program exits, or its output
+    // has been silent for `idle` — under the one deadline (#374).
+    // `wait_idle_for` is that race rather than half of it: it also returns
+    // on the EOF that says the child is gone. The reaping probe then says
+    // which arm fired, and only reaps a child that has already exited, so
+    // an exit lands on its own trailer with the finished screen. Two
+    // still-running trailers, because "at the deadline" is true of only one
+    // of the two ways the wait can end.
+    let trailer = match t.wait_idle_for(idle, timeout) {
+        Ok(()) => match t.wait_exit_for(REAP_GRACE) {
+            Ok(status) => format!("--- exited: {status} ---"),
+            Err(termlens::Error::Timeout { .. }) => {
+                "--- still running (killed on exit) ---".to_owned()
+            }
             // Not "still running": the OS wait itself failed, and saying so
             // is the difference between a slow program and a broken harness.
-            format!("--- waiting for the program failed: {e} ---")
+            Err(e) => format!("--- waiting for the program failed: {e} ---"),
+        },
+        Err(termlens::Error::Timeout { .. }) => {
+            "--- still running at the deadline (killed on exit) ---".to_owned()
         }
+        Err(e) => format!("--- waiting for the program failed: {e} ---"),
     };
     // One write, and a reader that closed early (`inspect … | head`) is a
     // clean exit rather than a panic on a broken pipe (#223).
